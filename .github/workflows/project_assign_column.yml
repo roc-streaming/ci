@@ -1,0 +1,41 @@
+name: "project_assign_column"
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        type: string
+        required: true
+      labeled:
+        type: string
+        required: true
+      column:
+        type: string
+        required: true
+    secrets:
+      triage-token:
+        required: true
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      # add item for issue to project
+      - uses: actions/add-to-project@v1.0.2
+        id: addItem
+        with:
+          project-url: "https://github.com/orgs/roc-streaming/projects/${{ inputs.project }}"
+          labeled: ${{ inputs.labeled }}
+          github-token: ${{ secrets.triage-token }}
+
+      # set item status (which is column in dashboard view)
+      - uses: kalgurn/update-project-item-status@v0.0.3
+        with:
+          project-url: "https://github.com/orgs/roc-streaming/projects/${{ inputs.project }}"
+          item-id: ${{ steps.addItem.outputs.itemId }}
+          status: ${{ inputs.column }}
+          github-token: ${{ secrets.triage-token }}

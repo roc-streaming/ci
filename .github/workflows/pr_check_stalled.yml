@@ -1,0 +1,30 @@
+name: "pr_check_stalled"
+
+on:
+  workflow_call:
+    inputs:
+      stale-days:
+        type: string
+        default: 180
+      close-days:
+        type: string
+        default: -1
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          stale-pr-label: "status: stalled"
+          stale-pr-message: ":robot: Pull request is automatically marked as stalled
+            because it has been open ${{ inputs.stale-days }} days with no activity."
+          close-pr-message: ":robot: Pull request is automatically closed
+            because it has been open ${{ inputs.close-days }} days with no activity."
+          days-before-stale: ${{ inputs.stale-days }}
+          days-before-close: ${{ inputs.close-days }}
+          remove-stale-when-updated: true

@@ -1,0 +1,39 @@
+name: "pr_check_issue"
+
+on:
+  workflow_call:
+
+permissions:
+  pull-requests: write
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+        with:
+          repository: roc-streaming/ci
+          path: ci
+
+      - name: Collect info
+        id: info
+        run: |
+          set -euxo pipefail
+          echo issue-url="$(ci/rgh.py show_pr --json --repo ${{ github.repository }} \
+                              ${{ github.event.pull_request.number }} \
+                              | jq -r .issue.url)" >> "$GITHUB_OUTPUT"
+        env:
+         GH_TOKEN: ${{ github.token }}
+
+      - name: Post comment
+        if: |
+          steps.info.outputs.issue-url == '' ||
+          steps.info.outputs.issue-url == 'null'
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: ":robot: Pull request description does not have a link to an issue.
+            \n
+            If there is a related issue, please add it to the description
+            using any of the [supported formats](https://docs.github.com/en/get-started/\
+            writing-on-github/working-with-advanced-formatting/autolinked-references-and-urls)."

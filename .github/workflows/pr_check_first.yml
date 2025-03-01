@@ -1,0 +1,37 @@
+name: "pr_check_contrib"
+
+on:
+  workflow_call:
+    inputs:
+      base-branch:
+        type: string
+        default: main
+
+permissions:
+  pull-requests: write
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: plbstl/first-contribution@v3
+        with:
+          labels: contribution
+          pr-opened-msg: |
+            :robot: Welcome! Thanks for your interest in contributing to the project!
+
+            Here is a short check-list to help you get started:
+
+             **Creating pull request**
+
+             - Target PR to ${{ inputs.base-branch }} branch.
+             - Reference related issue in PR description.
+             - Ensure all CI checks pass.
+
+             **Code review**
+
+             - Mark PR as draft until it's ready. When ready, undraft and request review.
+             - Don't resolve discussions by yourself, instead leave a comment or thumbs up.
+             - Re-request review after addressing all discussions.
+
+             Refer to [contribution guidelines](https://roc-streaming.org/toolkit/docs/development/contribution_guidelines.html) for futher details.

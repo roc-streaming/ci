@@ -1,0 +1,28 @@
+name: "trigger_build"
+
+on:
+  workflow_call:
+    inputs:
+      repo:
+        type: string
+        required: true
+      branch:
+        type: string
+        default: main
+    secrets:
+      ci-token:
+        required: true
+
+permissions:
+  actions: write
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -s -X POST \
+            "https://api.github.com/repos/roc-streaming/${{ inputs.repo }}/dispatches" \
+            -H 'Accept: application/vnd.github.everest-preview+json' \
+            -u "${{ secrets.ci-token }}" \
+            --data '{"event_type": "Trigger", "client_payload": { "branch": "${{ inputs.branch }}" }}'

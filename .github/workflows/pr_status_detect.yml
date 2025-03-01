@@ -1,0 +1,64 @@
+name: "pr_status_detect"
+
+on:
+  workflow_call:
+
+permissions:
+  pull-requests: write
+  checks: read
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+        with:
+          repository: roc-streaming/ci
+          path: ci
+
+      - name: Collect info
+        id: info
+        run: |
+          set -euxo pipefail
+          echo build-status="$(ci/rgh.py show_pr --json --repo ${{ github.repository }} \
+                                 ${{ github.event.pull_request.number }} \
+                                 | jq -r .actions.build)" >> "$GITHUB_OUTPUT"
+        env:
+         GH_TOKEN: ${{ github.token }}
+
+      - name: Collect labels
+        id: labels
+        uses: joerick/pr-labels-action@v1.0.9
+
+      - name: Add label (work in progress)
+        if: |
+          github.event.pull_request.draft == true ||
+          (steps.info.outputs.build-status == 'failure' &&
+           !contains(steps.labels.outputs.labels, 'status:'))
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            status: work in progress
+
+      - name: Post comment (work in progress)
+        if: |
+          steps.info.outputs.build-status == 'failure' &&
+          !contains(steps.labels.outputs.labels, 'status:')
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: ":robot: Pull request has failed checks and was automatically marked as
+            work-in-progress.
+            \n
+            If you believe the failures are unrelated or you want an early review, click on
+            the `request review` button. Otherwise, please fix failures before requesting review."
+
+      - name: Add label (ready for review)
+        if: |
+          tojson(github.event.pull_request.requested_reviewers) != '[]' ||
+          (steps.info.outputs.build-status == 'success' &&
+           !contains(steps.labels.outputs.labels, 'status:'))
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            status: ready for review

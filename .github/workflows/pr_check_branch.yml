@@ -1,0 +1,27 @@
+name: "pr_check_branch"
+
+on:
+  workflow_call:
+    inputs:
+      base-branch:
+        type: string
+        default: main
+
+permissions:
+  pull-requests: write
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post comment (wrong branch)
+        if: |
+          github.event.pull_request.base.ref != inputs.base-branch
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: ":robot: Pull request is not targeted to `${{ inputs.base-branch }}`
+            branch, which is usually wrong.
+            \n
+            If this was not intentional, please rebase on fresh `${{ inputs.base-branch }}` branch,
+            force-push, and re-target pull request using github web interface.
+            Remember to use rebase with force-push instead of regular merge."

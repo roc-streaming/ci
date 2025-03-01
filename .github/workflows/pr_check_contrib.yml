@@ -1,0 +1,35 @@
+name: "pr_check_contrib"
+
+on:
+  workflow_call:
+
+permissions:
+  pull-requests: write
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+        with:
+          repository: roc-streaming/ci
+          path: ci
+
+      - name: Collect info
+        id: info
+        run: |
+          set -euxo pipefail
+          echo is-contrib="$(ci/rgh.py show_pr --json --repo ${{ github.repository }} \
+                               ${{ github.event.pull_request.number }} \
+                               | jq -r .pull_request.contrib)" >> "$GITHUB_OUTPUT"
+        env:
+         GH_TOKEN: ${{ github.token }}
+
+      - name: Add label
+        if: |
+          steps.info.outputs.is-contrib == 'true'
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            contribution

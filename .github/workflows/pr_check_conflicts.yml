@@ -1,0 +1,25 @@
+name: "pr_check_conflicts"
+
+on:
+  workflow_call:
+    inputs:
+      base-branch:
+        type: string
+        default: main
+
+permissions:
+  pull-requests: write
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: eps1lon/actions-label-merge-conflict@v3
+        with:
+          dirtyLabel: "status: needs rebase"
+          commentOnDirty: ":robot: Pull request is currently unmergeable due to conflicts.
+            \n
+            Please rebase on fresh `${{ inputs.base-branch }}` branch, resolve merge conflicts,
+            and force-push to pull request's branch.
+            Remember to use rebase with force-push instead of regular merge."
+          repoToken: ${{ github.token }}

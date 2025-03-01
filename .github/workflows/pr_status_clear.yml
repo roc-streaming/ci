@@ -1,0 +1,20 @@
+name: "pr_status_clear"
+
+on:
+  workflow_call:
+
+permissions:
+  pull-requests: write
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: |
+            status: work in progress
+            status: ready for review
+            status: review in progress
+            status: needs revision
+            status: needs rebase
