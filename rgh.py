@@ -11,6 +11,7 @@ import os
 import os.path
 import random
 import re
+import shutil
 import string
 import subprocess
 import sys
@@ -80,18 +81,45 @@ def run_cmd(cmd, input=None, env=None, retry_fn=None):
 
 # get org+repo from --repo arg
 def parse_repo(s):
+    org, repo = None, None
+
     if s:
         if '/' in s:
             org, repo = s.split('/', 2)
         else:
             org = 'roc-streaming'
             repo = s
-    else:
+
+    if repo is None:
+        try:
+            def_repo = subprocess.check_output(
+                ['gh', 'repo', 'set-default', '--view'], text=True).strip()
+            if '/' in def_repo:
+                org, repo = def_repo.split('/', 2)
+        except subprocess.CalledProcessError:
+            pass
+
+    if repo is None:
         url = subprocess.check_output(
             ['git', 'config', '--get', 'remote.origin.url'], text=True).strip()
         m = re.search(r'[:/](.+)/(.+?)(.git)?$', url)
         org, repo = m.group(1), m.group(2)
+
     return org, repo
+
+# check availability of required tools
+def check_tools():
+    if not shutil.which('git'):
+        error("'git' not found in PATH")
+
+    if not shutil.which('gh'):
+        error("'gh' not found in PATH")
+
+    try:
+        subprocess.check_call(['gh', 'auth', 'status'], stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        error("'gh' not logged in, run 'gh auth login'")
 
 # create worktree with unique name and path and chdir to it
 def enter_worktree():
@@ -841,6 +869,7 @@ if not os.environ.get('GH_TOKEN'):
         TOKEN = token
 
 colorama.init()
+check_tools()
 
 if args.command == 'stb_rebase':
     stb_rebase(args.base_branch)
