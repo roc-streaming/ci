@@ -1,4 +1,4 @@
-name: "pr_check_conflicts"
+name: "pr_detect_conflicts"
 
 on:
   workflow_call:
@@ -6,6 +6,9 @@ on:
       base-branch:
         type: string
         default: main
+    secrets:
+      triage-token:
+        required: true
 
 permissions:
   pull-requests: write
@@ -22,4 +25,4 @@ jobs:
             Please rebase on fresh `${{ inputs.base-branch }}` branch, resolve merge conflicts,
             and force-push to pull request's branch.
             Remember to use rebase with force-push instead of regular merge."
-          repoToken: ${{ github.token }}
+          repoToken: ${{ secrets.triage-token }}

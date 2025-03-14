@@ -1,7 +1,10 @@
-name: "pr_check_issue"
+name: "pr_detect_linked_issue"
 
 on:
   workflow_call:
+    secrets:
+      triage-token:
+        required: true
 
 permissions:
   pull-requests: write
@@ -17,19 +20,17 @@ jobs:
           path: ci
 
       - name: Collect info
-        id: info
+        id: pr-info
         run: |
-          set -euxo pipefail
-          echo issue-url="$(ci/rgh.py show_pr --json --repo ${{ github.repository }} \
-                              ${{ github.event.pull_request.number }} \
-                              | jq -r .issue.url)" >> "$GITHUB_OUTPUT"
+          echo info="$(ci/scripts/rgh.py show_pr --json --repo ${{ github.repository }} \
+              ${{ github.event.pull_request.number }})" >> "$GITHUB_OUTPUT"
         env:
-         GH_TOKEN: ${{ github.token }}
+         GH_TOKEN: ${{ secrets.triage-token }}
 
       - name: Post comment
         if: |
-          steps.info.outputs.issue-url == '' ||
-          steps.info.outputs.issue-url == 'null'
+          fromJson(steps.pr-info.outputs.info).issue.url == '' ||
+          fromJson(steps.pr-info.outputs.info).issue.url == 'null'
         uses: thollander/actions-comment-pull-request@v2
         with:
           message: ":robot: Pull request description does not have a link to an issue.
@@ -37,3 +38,4 @@ jobs:
             If there is a related issue, please add it to the description
             using any of the [supported formats](https://docs.github.com/en/get-started/\
             writing-on-github/working-with-advanced-formatting/autolinked-references-and-urls)."
+          github-token: ${{ secrets.triage-token }}

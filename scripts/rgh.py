@@ -322,6 +322,16 @@ def query_pr_info(org, repo, pr_number, no_git=False):
     else:
         pr_info['pr_milestone'] = None
 
+    pr_info['pr_labels'] = [label['name'] for label in response['labels']]
+
+    try:
+        subprocess.run(
+            ['gh', 'api', f'/orgs/{org}/members/'+pr_info['pr_author']],
+            capture_output=True, text=True, check=True)
+        pr_info['pr_contrib'] = False
+    except subprocess.CalledProcessError as e:
+        pr_info['pr_contrib'] = True
+
     pr_info['issue_link'] = None
 
     if 'body' in response:
@@ -338,15 +348,59 @@ def query_pr_info(org, repo, pr_number, no_git=False):
         issue_info = query_issue_info(*pr_info['issue_link'])
         pr_info.update(issue_info)
 
-    try:
-        subprocess.run(
-            ['gh', 'api', f'/orgs/{org}/members/'+pr_info['pr_author']],
-            capture_output=True, text=True, check=True)
-        pr_info['pr_contrib'] = False
-    except subprocess.CalledProcessError as e:
-        pr_info['pr_contrib'] = True
+    review_info = query_pr_review(org, repo, pr_number)
+    pr_info.update(review_info)
 
     return pr_info
+
+@functools.cache
+def query_pr_review(org, repo, pr_number):
+    try:
+        response = subprocess.run(
+            ['gh', 'pr', 'view',
+             '--repo', f'{org}/{repo}',
+             str(pr_number),
+             '--json',
+             'reviewRequests,reviews'],
+            capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        error(f'failed to retrieve review state: {e.stderr.strip()}')
+
+    data = json.loads(response.stdout)
+
+    def _review_decision():
+        reviews = data['reviews']
+
+        # filter out non-MEMBERS
+        reviews = [r for r in reviews if r.get('authorAssociation') == 'MEMBER']
+        if not reviews:
+            return 'none'
+
+        # filter out COMMENTED reviews
+        reviews = [r for r in reviews if r['state'] != 'COMMENTED']
+        if not reviews:
+            return 'commented'
+
+        # keep only the latest review from each author
+        unique_authors = []
+        unique_states = []
+        for review in reversed(reviews):
+            if review['author']['login'] not in unique_authors:
+                unique_authors.append(review['author']['login'])
+                unique_states.append(review['state'])
+
+        # consider pr approved only if last review of every MEMBER that leaved
+        # non-COMMENTED review was APPROVED
+        if all(state == 'APPROVED' for state in unique_states):
+            return 'approved'
+        else:
+            return 'changes_requested'
+
+    review_info = {}
+    review_info['review_requested'] = len(data['reviewRequests']) != 0
+    review_info['review_decision'] = _review_decision()
+
+    return review_info
 
 @functools.cache
 def query_pr_actions(org, repo, pr_number, no_git=False):
@@ -354,21 +408,18 @@ def query_pr_actions(org, repo, pr_number, no_git=False):
 
     try:
         response = json.loads(subprocess.run([
-            'gh', 'api',
-            f'/repos/{org}/{repo}/actions/runs?event=pull_request',
+            'gh', 'pr', 'checks',
+            '--repo', f'{org}/{repo}',
+            '--json', 'workflow,state',
+            str(pr_number),
             ],
             capture_output=True, text=True, check=True).stdout)
     except subprocess.CalledProcessError as e:
         error(f'failed to retrieve workflow runs: {e.stderr.strip()}')
 
     results = {}
-    for run in response['workflow_runs']:
-        if run['head_sha'] != pr_info['source_sha']:
-            continue
-        status = run['status']
-        if status == 'completed':
-            status = run['conclusion']
-        results[run['name']] = status
+    for check in response:
+        results[check['workflow']] = check['state'].lower()
 
     return sorted(results.items())
 
@@ -444,9 +495,16 @@ def show_pr(org, repo, pr_number, show_json):
             pass
         else:
             if color:
-                print(f'  {color}{Style.BRIGHT}{val}{Style.RESET_ALL}')
+                print(f'    {color}{Style.BRIGHT}{val}{Style.RESET_ALL}')
             else:
-                print(f'  {val}')
+                print(f'    {val}')
+
+    def add_label(label):
+        if show_json:
+            nonlocal json_section
+            json_section.append(label)
+        else:
+            print(f'    {label}')
 
     def add_commit(sha, msg, author, email):
         if show_json:
@@ -460,7 +518,7 @@ def show_pr(org, repo, pr_number, show_json):
         else:
             if 'users.noreply.github.com' in email:
                 email = 'noreply.github.com'
-            print(f'  {sha[:8]} {Fore.BLUE}{Style.BRIGHT}{msg}{Style.RESET_ALL}'+
+            print(f'    {sha[:8]} {Fore.BLUE}{Style.BRIGHT}{msg}{Style.RESET_ALL}'+
                 f' ({author} <{email}>)')
 
     start_section('pull request')
@@ -492,6 +550,20 @@ def show_pr(org, repo, pr_number, show_json):
     else:
         add_line('not found', Fore.RED)
 
+    start_section('labels', list)
+    has_labels = False
+    for label_name in pr_info['pr_labels']:
+        has_labels = True
+        add_label(label_name)
+    if not has_labels:
+        add_line('no labels')
+
+    start_section('review')
+    add_field('requested', str(pr_info['review_requested']).lower(),
+              Fore.MAGENTA if not pr_info['review_requested'] else Fore.RED)
+    add_field('decision', pr_info['review_decision'],
+              Fore.MAGENTA if pr_info['review_decision'] != 'changes_requested' else Fore.RED)
+
     start_section('actions')
     has_actions = False
     for action_name, action_result in pr_actions:
@@ -510,11 +582,14 @@ def show_pr(org, repo, pr_number, show_json):
         add_line('not found', Fore.RED)
 
     if show_json:
-        print(json.dumps(json_result, indent=2))
+        if sys.stdout.isatty():
+            print(json.dumps(json_result, indent=2))
+        else:
+            print(json.dumps(json_result))
 
 # die if PR does not fulfill all requirements
 def verify_pr(org, repo, pr_number, issue_number, issue_miletsone, no_issue, no_milestone,
-              ignore_actions, ignore_state):
+              ignore_actions, ignore_state, ignore_review):
     pr_info = query_pr_info(org, repo, pr_number)
 
     if not no_issue:
@@ -534,16 +609,23 @@ def verify_pr(org, repo, pr_number, issue_number, issue_miletsone, no_issue, no_
 
     if not ignore_state:
         if pr_info['pr_state'] != 'open':
-            error("can't proceed on non-open pr")
+            error("can't proceed on non-open pr\n"
+                  "use --ignore-state to proceed anyway")
 
         if pr_info['pr_draft']:
-            error("can't proceed on draft pr")
+            error("can't proceed on draft pr\n"
+                  "use --ignore-state to proceed anyway")
 
     if not ignore_actions:
         for action_name, action_result in query_pr_actions(org, repo, pr_number):
             if action_result != 'success':
                 error("can't proceed on pr with failed checks\n"
                       "use --ignore-actions to proceed anyway")
+
+    if not ignore_review:
+        if pr_info['review_decision'] == 'changes_requested':
+            error("can't proceed on pr with requested changes\n"
+                  "use --ignore-review to proceed anyway")
 
 # checkout PR's branch
 def checkout_pr(org, repo, pr_number):
@@ -853,6 +935,8 @@ merge_pr_parser.add_argument('--ignore-actions', action='store_true', dest='igno
                              help="proceed even if pr github actions are failed")
 merge_pr_parser.add_argument('--ignore-state', action='store_true', dest='ignore_state',
                              help="proceed even if pr is closed or draft")
+merge_pr_parser.add_argument('--ignore-review', action='store_true', dest='ignore_review',
+                             help="proceed even if pr has requested changes")
 merge_pr_parser.add_argument('--no-push', action='store_true', dest='no_push',
                              help="don't actually push and merge anything")
 merge_pr_parser.add_argument('-n', '--dry-run', action='store_true', dest='dry_run',
@@ -886,7 +970,7 @@ if args.command == 'merge_pr':
         error("either --rebase or --squash should be specified")
     verify_pr(org, repo, args.pr_number, args.issue_number,
               args.milestone_name, args.no_issue, args.no_milestone,
-              args.ignore_actions, args.ignore_state)
+              args.ignore_actions, args.ignore_state, args.ignore_review)
     # create new worktree in /tmp, where we'll checkout pr's branch
     orig_path = enter_worktree()
     merged = False

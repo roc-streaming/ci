@@ -1,7 +1,14 @@
-name: "pr_status_clear"
+name: "pr_handle_closed"
 
 on:
   workflow_call:
+    inputs:
+      pr-number:
+        required: true
+        type: number
+    secrets:
+      triage-token:
+        required: true
 
 permissions:
   pull-requests: write
@@ -18,3 +25,5 @@ jobs:
             status: review in progress
             status: needs revision
             status: needs rebase
+          number: ${{ inputs.pr-number }}
+          github_token: ${{ secrets.triage-token }}

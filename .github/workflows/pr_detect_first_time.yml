@@ -1,4 +1,4 @@
-name: "pr_check_contrib"
+name: "pr_detect_first_time"
 
 on:
   workflow_call:
@@ -6,6 +6,9 @@ on:
       base-branch:
         type: string
         default: main
+    secrets:
+      triage-token:
+        required: true
 
 permissions:
   pull-requests: write
@@ -35,3 +38,4 @@ jobs:
              - Re-request review after addressing all discussions.
 
              Refer to [contribution guidelines](https://roc-streaming.org/toolkit/docs/development/contribution_guidelines.html) for futher details.
+          token: ${{ secrets.triage-token }}
