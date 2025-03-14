@@ -1,4 +1,4 @@
-name: "pr_check_branch"
+name: "pr_detect_target_branch"
 
 on:
   workflow_call:
@@ -6,6 +6,9 @@ on:
       base-branch:
         type: string
         default: main
+    secrets:
+      triage-token:
+        required: true
 
 permissions:
   pull-requests: write
@@ -25,3 +28,4 @@ jobs:
             If this was not intentional, please rebase on fresh `${{ inputs.base-branch }}` branch,
             force-push, and re-target pull request using github web interface.
             Remember to use rebase with force-push instead of regular merge."
+          github-token: ${{ secrets.triage-token }}

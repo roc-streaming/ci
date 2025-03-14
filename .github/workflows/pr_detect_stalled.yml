@@ -1,4 +1,4 @@
-name: "pr_check_stalled"
+name: "pr_detect_stalled"
 
 on:
   workflow_call:
@@ -9,6 +9,9 @@ on:
       close-days:
         type: string
         default: -1
+    secrets:
+      triage-token:
+        required: true
 
 permissions:
   issues: write
@@ -28,3 +31,4 @@ jobs:
           days-before-stale: ${{ inputs.stale-days }}
           days-before-close: ${{ inputs.close-days }}
           remove-stale-when-updated: true
+          repo-token: ${{ secrets.triage-token }}

@@ -1,0 +1,65 @@
+name: "pr_handle_reviewed"
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        required: true
+        type: number
+    secrets:
+      triage-token:
+        required: true
+
+permissions:
+  pull-requests: write
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+        with:
+          repository: roc-streaming/ci
+          path: ci
+
+      - name: Collect info
+        id: pr-info
+        run: |
+          echo info="$(ci/scripts/rgh.py show_pr --json --repo ${{ github.repository }} \
+              ${{ inputs.pr-number }})" >> "$GITHUB_OUTPUT"
+        env:
+         GH_TOKEN: ${{ secrets.triage-token }}
+
+      - name: Remove labels (approved)
+        if: |
+          fromJson(steps.pr-info.outputs.info).review.decision == 'approved'
+        uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: |
+            status: ready for review
+            status: needs revision
+            status: review in progress
+          number: ${{ inputs.pr-number }}
+          github_token: ${{ secrets.triage-token }}
+
+      - name: Remove labels (changes requested)
+        if: |
+          fromJson(steps.pr-info.outputs.info).review.decision == 'changes_requested'
+        uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: |
+            status: ready for review
+            status: work in progress
+          number: ${{ inputs.pr-number }}
+          github_token: ${{ secrets.triage-token }}
+
+      - name: Add labels (changes requested)
+        if: |
+          fromJson(steps.pr-info.outputs.info).review.decision == 'changes_requested'
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            status: needs revision
+          number: ${{ inputs.pr-number }}
+          github_token: ${{ secrets.triage-token }}

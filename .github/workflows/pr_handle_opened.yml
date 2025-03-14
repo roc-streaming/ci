@@ -1,0 +1,83 @@
+name: "pr_handle_opened"
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        required: true
+        type: number
+    secrets:
+      triage-token:
+        required: true
+
+permissions:
+  pull-requests: write
+  checks: read
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+        with:
+          repository: roc-streaming/ci
+          path: ci
+
+      - name: Wait build
+        run: |
+          while :; do
+              state="$(ci/scripts/rgh.py show_pr --json --repo ${{ github.repository }} \
+                  ${{ inputs.pr-number }} | jq -r .actions.build)"
+              if [ $state = "success" -o $state = "failure" ]; then
+                  break
+              fi
+              sleep 0.5
+          done
+        env:
+         GH_TOKEN: ${{ secrets.triage-token }}
+
+      - name: Collect info
+        id: pr-info
+        run: |
+          echo info="$(ci/scripts/rgh.py show_pr --json --repo ${{ github.repository }} \
+              ${{ inputs.pr-number }})" >> "$GITHUB_OUTPUT"
+        env:
+         GH_TOKEN: ${{ secrets.triage-token }}
+
+      - name: Add label (work in progress)
+        if: |
+          fromJson(steps.pr-info.outputs.info).pull_request.draft == 'true' ||
+          (fromJson(steps.pr-info.outputs.info).actions.build == 'failure' &&
+           !contains(toJson(fromJson(steps.pr-info.outputs.info).labels), 'status:'))
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            status: work in progress
+          number: ${{ inputs.pr-number }}
+          github_token: ${{ secrets.triage-token }}
+
+      - name: Post comment (work in progress)
+        if: |
+          fromJson(steps.pr-info.outputs.info).actions.build == 'failure' &&
+          !contains(toJson(fromJson(steps.pr-info.outputs.info).labels), 'status:')
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: ":robot: Pull request has failed checks and was automatically marked as
+            work-in-progress.
+            \n
+            If you believe the failures are unrelated or you want an early review, click on
+            the `request review` button. Otherwise, please fix failures before requesting review."
+          github-token: ${{ secrets.triage-token }}
+
+      - name: Add label (ready for review)
+        if: |
+          fromJson(steps.pr-info.outputs.info).review.requested == 'true' ||
+          (fromJson(steps.pr-info.outputs.info).actions.build == 'success' &&
+           !contains(toJson(fromJson(steps.pr-info.outputs.info).labels), 'status:'))
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            status: ready for review
+          number: ${{ inputs.pr-number }}
+          github_token: ${{ secrets.triage-token }}

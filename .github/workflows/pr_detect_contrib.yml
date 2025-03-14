@@ -1,7 +1,10 @@
-name: "pr_check_contrib"
+name: "pr_detect_contrib"
 
 on:
   workflow_call:
+    secrets:
+      triage-token:
+        required: true
 
 permissions:
   pull-requests: write
@@ -17,19 +20,18 @@ jobs:
           path: ci
 
       - name: Collect info
-        id: info
+        id: pr-info
         run: |
-          set -euxo pipefail
-          echo is-contrib="$(ci/rgh.py show_pr --json --repo ${{ github.repository }} \
-                               ${{ github.event.pull_request.number }} \
-                               | jq -r .pull_request.contrib)" >> "$GITHUB_OUTPUT"
+          echo info="$(ci/scripts/rgh.py show_pr --json --repo ${{ github.repository }} \
+              ${{ github.event.pull_request.number }})" >> "$GITHUB_OUTPUT"
         env:
-         GH_TOKEN: ${{ github.token }}
+         GH_TOKEN: ${{ secrets.triage-token }}
 
       - name: Add label
         if: |
-          steps.info.outputs.is-contrib == 'true'
+          fromJson(steps.pr-info.outputs.info).pull_request.contrib == 'true'
         uses: actions-ecosystem/action-add-labels@v1
         with:
           labels: |
             contribution
+          github_token: ${{ secrets.triage-token }}
