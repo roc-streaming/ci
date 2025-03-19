@@ -27,6 +27,7 @@ func Main(args map[string]any) map[string]any {
 		return makeErr("bad request: missing http")
 	}
 
+	// parse headers
 	headers, ok := httpArg["headers"].(map[string]any)
 	if !ok {
 		return makeErr("bad request: missing http.headers")
@@ -42,6 +43,7 @@ func Main(args map[string]any) map[string]any {
 		return makeErr("bad request: missing http.headers.x-github-event")
 	}
 
+	// parse query
 	queryStr, ok := httpArg["queryString"].(string)
 	if !ok {
 		return makeErr("bad request: missing http.queryString")
@@ -57,6 +59,7 @@ func Main(args map[string]any) map[string]any {
 		return makeErr("bad request: missing http.queryString.key")
 	}
 
+	// decrypt .env using ?key=... from github
 	ghSecret := os.Getenv("GH_SECRET")
 	ghToken := os.Getenv("GH_TOKEN")
 
@@ -71,6 +74,7 @@ func Main(args map[string]any) map[string]any {
 		}
 	}
 
+	// get body
 	body, ok := httpArg["body"].(string)
 	if !ok {
 		return makeErr("bad request: missing http.body")
@@ -85,10 +89,12 @@ func Main(args map[string]any) map[string]any {
 		body = string(b)
 	}
 
+	// verify body signature with decrypted github secret
 	if enableEncryption && !verifyHmac(body, ghSignature, ghSecret) {
 		return makeErr("bad request: can't validate http.body")
 	}
 
+	// parse body
 	var payload map[string]any
 	if err := json.Unmarshal([]byte(body), &payload); err != nil {
 		return makeErr("bad request: can't parse http.body: %s", err)
@@ -109,24 +115,41 @@ func Main(args map[string]any) map[string]any {
 		return makeErr("bad request: missing body.repository.full_name")
 	}
 
+	// safety check
 	if !strings.HasPrefix(repoName, "roc-streaming/") {
 		return makeErr("bad request: unexpected repository")
 	}
 
-	pr, ok := payload["pull_request"].(map[string]any)
-	if !ok {
-		return makeErr("bad request: missing body.pull_request")
+	// pull request or issue number (depending on event type)
+	var number float64
+
+	if strings.HasPrefix(ghEvent, "pull_request") {
+		pullreq, ok := payload["pull_request"].(map[string]any)
+		if !ok {
+			return makeErr("bad request: missing body.pull_request")
+		}
+		number, ok = pullreq["number"].(float64)
+		if !ok {
+			return makeErr("bad request: missing body.pull_request.number")
+		}
+		if number <= 0 {
+			return makeErr("bad request: invalid body.pull_request.number")
+		}
+	} else {
+		issue, ok := payload["issue"].(map[string]any)
+		if !ok {
+			return makeErr("bad request: missing body.issue")
+		}
+		number, ok = issue["number"].(float64)
+		if !ok {
+			return makeErr("bad request: missing body.issue.number")
+		}
+		if number <= 0 {
+			return makeErr("bad request: invalid body.issue.number")
+		}
 	}
 
-	prNumber, ok := pr["number"].(float64)
-	if !ok {
-		return makeErr("bad request: missing body.pull_request.number")
-	}
-
-	if prNumber <= 0 {
-		return makeErr("bad request: invalid body.pull_request.number")
-	}
-
+	// filter out unneeded events to avoid spamming
 	dispEvent := ""
 
 	switch ghEvent {
@@ -138,19 +161,29 @@ func Main(args map[string]any) map[string]any {
 			dispEvent = "pull_request_" + ghAction
 		}
 	case "pull_request_review":
-		dispEvent = "pull_request_review_" + ghAction
+		switch ghAction {
+		case "submitted", "edited", "dismissed":
+			dispEvent = "pull_request_review_" + ghAction
+		}
+	case "issue":
+		switch ghAction {
+		case "opened", "reopened", "closed",
+			"labeled", "unlabeled":
+			dispEvent = "issue_" + ghAction
+		}
 	}
 
 	if dispEvent == "" {
 		return makeErr("bad request: unsupported event %s/%s", ghEvent, ghAction)
 	}
 
+	// build repository_dispatch request
 	dispReqURL := fmt.Sprintf("https://api.github.com/repos/%s/dispatches", repoName)
 
 	dispReqBody, _ := json.Marshal(map[string]any{
 		"event_type": dispEvent,
 		"client_payload": map[string]any{
-			"pr_number": prNumber,
+			"number": number,
 		},
 	})
 
@@ -159,6 +192,7 @@ func Main(args map[string]any) map[string]any {
 	dispReq.Header.Set("Accept", "application/vnd.github.v3+json")
 	dispReq.Header.Set("Content-Type", "application/json")
 
+	// send request
 	dispResp, err := http.DefaultClient.Do(dispReq)
 	if err != nil {
 		return makeErr("dispatch request failed: " + err.Error())
@@ -167,12 +201,13 @@ func Main(args map[string]any) map[string]any {
 
 	dispRespBody, _ := io.ReadAll(dispResp.Body)
 
+	// forward response and some info to caller
 	return map[string]any{
 		"body": map[string]any{
 			"event":             ghEvent,
 			"action":            ghAction,
 			"repo":              repoName,
-			"pr_number":         prNumber,
+			"number":            number,
 			"dispatch_url":      dispReqURL,
 			"dispatch_request":  dispReqBody,
 			"dispatch_status":   dispResp.Status,

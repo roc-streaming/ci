@@ -11,9 +11,9 @@ async function main() {
   const client = github.getOctokit(token);
 
   const findIssueResponse = await client.rest.issues.get({
-    github.context.repo.owner,
-    github.context.repo.repo,
-    issue_number: issueNumber
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
+    issue_number: issueNumber,
   });
 
   const contentId = findIssueResponse.data.node_id;
