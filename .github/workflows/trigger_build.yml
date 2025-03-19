@@ -22,8 +22,8 @@ jobs:
     steps:
       - run: |
           curl -s -X POST \
-            "https://api.github.com/repos/roc-streaming/${{ inputs.repo }}/dispatches" \
+            'https://api.github.com/repos/roc-streaming/${{ inputs.repo }}/dispatches' \
             -H 'Accept: application/vnd.github.everest-preview+json' \
-            -u "${{ secrets.ci-token }}" \
+            -u '${{ secrets.ci-token }}' \
             --data \
             '{"event_type": "trigger_build", "client_payload": {"branch": "${{ inputs.branch }}"}}'
