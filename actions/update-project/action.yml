@@ -1,0 +1,20 @@
+name: 'Update project and status'
+description: 'Update project and status of issue or pull request'
+
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
+  number:
+    description: 'Issue or pull request number'
+    required: true
+  project:
+    description: 'Project number'
+    required: true
+  status:
+    description: 'Optional status in project'
+    required: false
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

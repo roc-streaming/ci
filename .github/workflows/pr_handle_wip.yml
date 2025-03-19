@@ -24,22 +24,14 @@ jobs:
           github-token: ${{ secrets.triage-token }}
 
       - if: |
-          fromJson(steps.pr-info.outputs.info).pull_request.draft == 'true' ||
-          fromJson(steps.pr-info.outputs.info).review.requested == 'false'
-        uses: actions-ecosystem/action-remove-labels@v1
+          fromJson(steps.pr-info.outputs.info).pull_request.is_draft == true ||
+          fromJson(steps.pr-info.outputs.info).review.requested == false
+        uses: roc-streaming/ci/actions/update-labels@main
         with:
-          labels: |
+          number: ${{ inputs.pr-number }}
+          remove-labels: |
             status: ready for review
             status: needs revision
-          number: ${{ inputs.pr-number }}
-          github_token: ${{ secrets.triage-token }}
-
-      - if: |
-          fromJson(steps.pr-info.outputs.info).pull_request.draft == 'true' ||
-          fromJson(steps.pr-info.outputs.info).review.requested == 'false'
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          labels: |
+          add-labels: |
             status: work in progress
-          number: ${{ inputs.pr-number }}
-          github_token: ${{ secrets.triage-token }}
+          github-token: ${{ secrets.triage-token }}

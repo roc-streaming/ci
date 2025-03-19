@@ -32,17 +32,6 @@ jobs:
           github-token: ${{ secrets.triage-token }}
 
       - if: |
-          fromJson(steps.pr-info.outputs.info).pull_request.draft == 'true' ||
-          (fromJson(steps.pr-info.outputs.info).actions.build == 'failure' &&
-           !contains(toJson(fromJson(steps.pr-info.outputs.info).labels), 'status:'))
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          labels: |
-            status: work in progress
-          number: ${{ inputs.pr-number }}
-          github_token: ${{ secrets.triage-token }}
-
-      - if: |
           fromJson(steps.pr-info.outputs.info).actions.build == 'failure' &&
           !contains(toJson(fromJson(steps.pr-info.outputs.info).labels), 'status:')
         uses: roc-streaming/ci/actions/post-comment@main
@@ -56,12 +45,23 @@ jobs:
           github-token: ${{ secrets.triage-token }}
 
       - if: |
-          fromJson(steps.pr-info.outputs.info).review.requested == 'true' ||
+          fromJson(steps.pr-info.outputs.info).pull_request.is_draft == true ||
+          (fromJson(steps.pr-info.outputs.info).actions.build == 'failure' &&
+           !contains(toJson(fromJson(steps.pr-info.outputs.info).labels), 'status:'))
+        uses: roc-streaming/ci/actions/update-labels@main
+        with:
+          number: ${{ inputs.pr-number }}
+          add-labels: |
+            status: work in progress
+          github-token: ${{ secrets.triage-token }}
+
+      - if: |
+          fromJson(steps.pr-info.outputs.info).review.requested == true ||
           (fromJson(steps.pr-info.outputs.info).actions.build == 'success' &&
            !contains(toJson(fromJson(steps.pr-info.outputs.info).labels), 'status:'))
-        uses: actions-ecosystem/action-add-labels@v1
+        uses: roc-streaming/ci/actions/update-labels@main
         with:
-          labels: |
-            status: ready for review
           number: ${{ inputs.pr-number }}
-          github_token: ${{ secrets.triage-token }}
+          add-labels: |
+            status: ready for review
+          github-token: ${{ secrets.triage-token }}

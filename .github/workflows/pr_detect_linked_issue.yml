@@ -24,8 +24,7 @@ jobs:
           github-token: ${{ secrets.triage-token }}
 
       - if: |
-          fromJson(steps.pr-info.outputs.info).issue.url == '' ||
-          fromJson(steps.pr-info.outputs.info).issue.url == 'null'
+          fromJson(steps.pr-info.outputs.info).linked_issue == null
         uses: roc-streaming/ci/actions/post-comment@main
         with:
           number: ${{ inputs.pr-number }}

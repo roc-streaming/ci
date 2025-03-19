@@ -1,0 +1,9 @@
+{
+  "name": "update-project",
+  "version": "0.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0"
+  }
+}

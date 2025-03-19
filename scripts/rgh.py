@@ -29,17 +29,6 @@ def print_cmd(cmd):
     pretty = ' '.join(['"'+c+'"' if ' ' in c else c for c in map(str, cmd)])
     print(f'{Fore.YELLOW}{pretty}{Style.RESET_ALL}')
 
-def find_token(machine, login):
-    path = os.path.expanduser('~/.authinfo')
-    if not os.path.exists(path):
-        return
-    with open(path) as fp:
-        for line in fp:
-            it = iter(line.split())
-            entry = dict(zip(it, it))
-            if entry.get('machine') == machine and entry.get('login') == login:
-                return entry.get('password')
-
 def run_cmd(cmd, input=None, env=None, retry_fn=None):
     cmd = [str(c) for c in cmd]
 
@@ -274,11 +263,14 @@ def query_issue_info(org, repo, issue_number):
 
     issue_info['issue_title'] = response['title']
     issue_info['issue_url'] = response['html_url']
+    issue_info['issue_author'] = response['user']['login']
 
     if response['milestone']:
         issue_info['issue_milestone'] = response['milestone']['title']
     else:
         issue_info['issue_milestone'] = None
+
+    issue_info['issue_labels'] = [label['name'] for label in response['labels']]
 
     return issue_info
 
@@ -463,129 +455,238 @@ def find_pr_fork_point(org, repo, pr_number):
 
     return fork_point
 
-# print info about PR and linked issue
-def show_pr(org, repo, pr_number, show_json):
+# dump pr info in json format
+def build_pr_json(org, repo, pr_number):
     pr_info = query_pr_info(org, repo, pr_number, no_git=True)
     pr_actions = query_pr_actions(org, repo, pr_number, no_git=True)
     pr_commits = query_pr_commits(org, repo, pr_number, no_git=True)
 
-    json_result = OrderedDict()
-    json_section = {}
+    result = OrderedDict()
 
-    def start_section(name, ctor=OrderedDict):
-        if show_json:
-            nonlocal json_result, json_section
-            json_section = ctor()
-            json_result[name.replace(' ', '_')] = json_section
-        else:
-            print(f'{Fore.GREEN}{Style.BRIGHT}{name}:{Style.RESET_ALL}')
+    result['pull_request'] = OrderedDict([
+        ('title', pr_info['pr_title']),
+        ('url', pr_info['pr_url']),
+        ('author', pr_info['pr_author']),
+        ('milestone', pr_info['pr_milestone']),
+        ('labels', pr_info['pr_labels']),
+        ('source_branch', pr_info['source_branch']),
+        ('target_branch', pr_info['target_branch']),
+        ('state', pr_info['pr_state']),
+        ('is_draft', pr_info['pr_draft']),
+        ('is_contrib', pr_info['pr_contrib']),
+        ('is_mergeable', pr_info['pr_mergeable']),
+        ('is_rebaseable', pr_info['pr_rebaseable']),
+        ])
 
-    def add_field(key, val, color=None):
-        if show_json:
-            nonlocal json_section
-            json_section[key] = val
-        else:
-            if color:
-                print(f'    {key}: {color}{Style.BRIGHT}{val}{Style.RESET_ALL}')
+    if pr_info['issue_link']:
+        result['linked_issue'] = OrderedDict([
+            ('title', pr_info['issue_title']),
+            ('url', pr_info['issue_url']),
+            ('author', pr_info['issue_author']),
+            ('milestone', pr_info['issue_milestone']),
+            ('labels', pr_info['issue_labels']),
+        ])
+    else:
+        result['linked_issue'] = None
+
+    result['review'] = OrderedDict([
+        ('requested', pr_info['review_requested']),
+        ('decision', pr_info['review_decision']),
+    ])
+
+    result['actions'] = OrderedDict()
+    for action_name, action_result in pr_actions:
+        has_actions = True
+        result['actions'][action_name] = action_result
+
+    result['commits'] = []
+    for commit_sha, commit_msg, commit_author, commit_email in pr_commits:
+        result['commits'].append(OrderedDict([
+            ('message', commit_msg),
+            ('sha', commit_sha),
+            ('author', commit_author),
+            ('email', commit_email),
+        ]))
+
+    return result
+
+# dump issue info in json format
+def build_issue_json(org, repo, issue_number):
+    issue_info = query_issue_info(org, repo, issue_number)
+
+    result = OrderedDict()
+
+    result['issue'] = OrderedDict([
+        ('title', issue_info['issue_title']),
+        ('url', issue_info['issue_url']),
+        ('author', issue_info['issue_author']),
+        ('milestone', issue_info['issue_milestone']),
+        ('labels', issue_info['issue_labels']),
+    ])
+
+    return result
+
+def print_json(js):
+    if sys.stdout.isatty():
+        print(json.dumps(js, indent=2))
+    else:
+        print(json.dumps(js))
+
+def print_text(text, color=None, depth=0):
+    indent = ''
+    if depth:
+        indent = ('    ' * depth)
+    if color:
+        print(f'{indent}{color}{Style.BRIGHT}{text}{Style.RESET_ALL}')
+    else:
+        print(f'{indent}{text}')
+
+def print_kv(key, val, color=None, depth=0):
+    indent = ''
+    if depth:
+        indent = ('    ' * depth)
+    if color:
+        print(f'{indent}{key}: {color}{Style.BRIGHT}{val}{Style.RESET_ALL}')
+    else:
+        print(f'{indent}{key}: {val}')
+
+def print_arr(key, vals, colors, depth):
+    if vals:
+        print_text(f'{key}:', color=None, depth=depth)
+        for n, val in enumerate(vals):
+            color = None
+            if colors:
+                color = colors[n]
+            print_text(val, color, depth+1)
+    else:
+        print_text(f'{key}: none', color=None, depth=depth)
+
+# print info about PR and linked issue
+def show_pr(org, repo, pr_number, show_json):
+    js = build_pr_json(org, repo, pr_number)
+
+    if show_json:
+        print_json(js)
+        return
+
+    print_text('pull request:', Fore.GREEN, depth=0)
+
+    for k, v in js['pull_request'].items():
+        if k == 'labels':
+            colors = [Fore.YELLOW if label.startswith('status:') else None \
+                      for label in v]
+            print_arr('labels', v, colors, depth=1)
+            continue
+
+        color = None
+        if k == 'title': color = Fore.BLUE
+        elif k == 'milestone':
+            if v: color = Fore.MAGENTA
             else:
-                print(f'    {key}: {val}')
+                color = Fore.RED
+                v = 'none'
+        elif k == 'source_branch' or k == 'target_branch':
+            color = Fore.CYAN
+        elif k == 'state':
+            if v == 'open': color = Fore.MAGENTA
+            else: color = Fore.RED
+        elif k == 'is_draft':
+            if not v: color = Fore.MAGENTA
+            else: color = Fore.RED
+            v = str(v).lower()
+        elif k == 'is_contrib':
+            color = Fore.MAGENTA
+            v = str(v).lower()
+        elif k == 'is_mergeable' or k == 'is_rebaseable':
+            if v: color = Fore.MAGENTA
+            else: color = Fore.RED
+            v = str(v).lower()
 
-    def add_line(val, color=None):
-        if show_json:
-            pass
-        else:
-            if color:
-                print(f'    {color}{Style.BRIGHT}{val}{Style.RESET_ALL}')
-            else:
-                print(f'    {val}')
+        print_kv(k, v, color, depth=1)
 
-    def add_label(label):
-        if show_json:
-            nonlocal json_section
-            json_section.append(label)
-        else:
-            print(f'    {label}')
+    print_text('linked issue:', Fore.GREEN, depth=0)
 
-    def add_commit(sha, msg, author, email):
-        if show_json:
-            nonlocal json_section
-            json_section.append({
-                'sha': sha,
-                'message': msg,
-                'author': author,
-                'email': email,
-            })
-        else:
+    if js['linked_issue']:
+        for k, v in js['linked_issue'].items():
+            if k == 'labels':
+                colors = [Fore.YELLOW if label.startswith('status:') else None \
+                          for label in v]
+                print_arr('labels', v, colors, depth=1)
+                continue
+
+            color = None
+            if k == 'title': color = Fore.BLUE
+            elif k == 'milestone':
+                if v: color = Fore.MAGENTA
+                else:
+                    color = Fore.RED
+                    v = 'none'
+            print_kv(k, v, color, depth=1)
+    else:
+        print_text('none', Fore.RED, depth=1)
+
+    print_text('review:', Fore.GREEN, depth=0)
+
+    for k, v in js['review'].items():
+        color = None
+        if k == 'requested':
+            if v: color = Fore.RED
+            else: color = Fore.MAGENTA
+            v = str(v).lower()
+        elif k == 'decision':
+            if v == 'changes_requested': color = Fore.RED
+            else: color = Fore.MAGENTA
+        print_kv(k, v, color, depth=1)
+
+    print_text('actions:', Fore.GREEN, depth=0)
+
+    if js['actions']:
+        for k, v in js['actions'].items():
+            color = None
+            if v == 'success': color = Fore.MAGENTA
+            else: color = Fore.RED
+            print_kv(k, v, color, depth=1)
+    else:
+        print_text('none', Fore.RED, depth=1)
+
+    print_text('commits:', Fore.GREEN, depth=0)
+
+    if js['commits']:
+        for commit in js['commits']:
+            sha, msg, author, email = \
+                commit['sha'], commit['message'], commit['author'], commit['email']
             if 'users.noreply.github.com' in email:
                 email = 'noreply.github.com'
             print(f'    {sha[:8]} {Fore.BLUE}{Style.BRIGHT}{msg}{Style.RESET_ALL}'+
                 f' ({author} <{email}>)')
-
-    start_section('pull request')
-    add_field('title', pr_info['pr_title'], Fore.BLUE)
-    add_field('url', pr_info['pr_url'])
-    add_field('author', pr_info['pr_author'])
-    add_field('milestone', str(pr_info['pr_milestone']).lower(),
-           Fore.MAGENTA if pr_info['pr_milestone'] is not None else Fore.RED)
-    add_field('source', pr_info['source_branch'], Fore.CYAN)
-    add_field('target', pr_info['target_branch'], Fore.CYAN)
-    add_field('state', pr_info['pr_state'],
-          Fore.MAGENTA if pr_info['pr_state'] == 'open' else Fore.RED)
-    add_field('draft', str(pr_info['pr_draft']).lower(),
-          Fore.MAGENTA if not pr_info['pr_draft'] else Fore.RED)
-    add_field('contrib', str(pr_info['pr_contrib']).lower(), Fore.CYAN)
-    add_field('mergeable', str(pr_info['pr_mergeable'] \
-                            if pr_info['pr_mergeable'] is not None else 'unknown').lower(),
-          Fore.MAGENTA if pr_info['pr_mergeable'] == True else Fore.RED)
-    add_field('rebaseable', str(pr_info['pr_rebaseable'] \
-                            if pr_info['pr_rebaseable'] is not None else 'unknown').lower(),
-          Fore.MAGENTA if pr_info['pr_rebaseable'] == True else Fore.RED)
-
-    start_section('issue')
-    if pr_info['issue_link']:
-        add_field('title', pr_info['issue_title'], Fore.BLUE)
-        add_field('url', pr_info['issue_url'])
-        add_field('milestone', str(pr_info['issue_milestone']).lower(),
-               Fore.MAGENTA if pr_info['issue_milestone'] is not None else Fore.RED)
     else:
-        add_line('not found', Fore.RED)
+        print_text('none', Fore.RED, depth=1)
 
-    start_section('labels', list)
-    has_labels = False
-    for label_name in pr_info['pr_labels']:
-        has_labels = True
-        add_label(label_name)
-    if not has_labels:
-        add_line('no labels')
-
-    start_section('review')
-    add_field('requested', str(pr_info['review_requested']).lower(),
-              Fore.MAGENTA if not pr_info['review_requested'] else Fore.RED)
-    add_field('decision', pr_info['review_decision'],
-              Fore.MAGENTA if pr_info['review_decision'] != 'changes_requested' else Fore.RED)
-
-    start_section('actions')
-    has_actions = False
-    for action_name, action_result in pr_actions:
-        has_actions = True
-        add_field(action_name, action_result,
-              Fore.MAGENTA if action_result == 'success' else Fore.RED)
-    if not has_actions:
-        add_line('not found', Fore.RED)
-
-    start_section('commits', list)
-    has_commits = False
-    for commit_sha, commit_msg, commit_author, commit_email in pr_commits:
-        has_commits = True
-        add_commit(commit_sha, commit_msg, commit_author, commit_email)
-    if not has_commits:
-        add_line('not found', Fore.RED)
+# print info about issue
+def show_issue(org, repo, issue_number, show_json):
+    js = build_issue_json(org, repo, issue_number)
 
     if show_json:
-        if sys.stdout.isatty():
-            print(json.dumps(json_result, indent=2))
-        else:
-            print(json.dumps(json_result))
+        print_json(js)
+        return
+
+    print_text('issue:', Fore.GREEN, depth=0)
+
+    for k, v in js['issue'].items():
+        if k == 'labels':
+            colors = [Fore.YELLOW if label.startswith('status:') else None \
+                      for label in v]
+            print_arr('labels', v, colors, depth=1)
+            continue
+
+        color = None
+        if k == 'title': color = Fore.BLUE
+        elif k == 'milestone':
+            if v: color = Fore.MAGENTA
+            else:
+                color = Fore.RED
+                v = 'none'
+        print_kv(k, v, color, depth=1)
 
 # die if PR does not fulfill all requirements
 def verify_pr(org, repo, pr_number, issue_number, issue_miletsone, no_issue, no_milestone,
@@ -906,6 +1007,13 @@ stb_rebase_parser = subparsers.add_parser(
     help="rebase local branch preserving author and date")
 stb_rebase_parser.add_argument('base_branch', action='store_true')
 
+show_issue_parser = subparsers.add_parser(
+    'show_issue', parents=[common_parser],
+    help="show issue info")
+show_issue_parser.add_argument('issue_number', type=int)
+show_issue_parser.add_argument('--json', action='store_true', dest='json',
+                            help="output in json format")
+
 show_pr_parser = subparsers.add_parser(
     'show_pr', parents=[common_parser],
     help="show pull request info")
@@ -947,11 +1055,6 @@ args = parser.parse_args()
 if hasattr(args, 'dry_run'):
     DRY_RUN = args.dry_run
 
-if not os.environ.get('GH_TOKEN'):
-    token = find_token('api.github.com', 'rocstreaming-bot')
-    if token:
-        TOKEN = token
-
 colorama.init()
 check_tools()
 
@@ -960,6 +1063,10 @@ if args.command == 'stb_rebase':
     exit(0)
 
 org, repo = parse_repo(args.repo)
+
+if args.command == 'show_issue':
+    show_issue(org, repo, args.issue_number, args.json)
+    exit(0)
 
 if args.command == 'show_pr':
     show_pr(org, repo, args.pr_number, args.json)

@@ -3,6 +3,9 @@ name: "project_assign"
 on:
   workflow_call:
     inputs:
+      number:
+        required: true
+        type: number
       project:
         type: string
         required: true
@@ -18,8 +21,8 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
-      # add item for *current* issue to project
-      - uses: actions/add-to-project@v1.0.2
+      - uses: roc-streaming/ci/actions/update-project@main
         with:
-          project-url: "https://github.com/orgs/roc-streaming/projects/${{ inputs.project }}"
+          number: ${{ inputs.number }}
+          project: ${{ inputs.project }}
           github-token: ${{ secrets.triage-token }}

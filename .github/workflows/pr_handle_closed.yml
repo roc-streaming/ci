@@ -17,13 +17,13 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions-ecosystem/action-remove-labels@v1
+      - uses: roc-streaming/ci/actions/update-labels@main
         with:
-          labels: |
+          number: ${{ inputs.pr-number }}
+          remove-labels: |
             status: work in progress
             status: ready for review
             status: review in progress
             status: needs revision
             status: needs rebase
-          number: ${{ inputs.pr-number }}
-          github_token: ${{ secrets.triage-token }}
+          github-token: ${{ secrets.triage-token }}

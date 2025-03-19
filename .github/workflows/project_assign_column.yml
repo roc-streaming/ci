@@ -3,13 +3,16 @@ name: "project_assign_column"
 on:
   workflow_call:
     inputs:
+      number:
+        required: true
+        type: number
       project:
         type: string
         required: true
-      labeled:
+      if-labeled:
         type: string
         required: true
-      column:
+      set-column:
         type: string
         required: true
     secrets:
@@ -24,20 +27,17 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
-      # add item for *current* issue to project
-      - uses: actions/add-to-project@v1.0.2
-        id: add-item
+      - uses: roc-streaming/ci/actions/issue-info@main
+        id: issue-info
         with:
-          project-url: "https://github.com/orgs/roc-streaming/projects/${{ inputs.project }}"
-          labeled: ${{ inputs.labeled }}
+          number: ${{ inputs.number }}
           github-token: ${{ secrets.triage-token }}
 
-      # set item status (column in dashboard view)
-      - uses: github/update-project-action@v3
+      - if: |
+          contains(fromJson(steps.issue-info.outputs.info).issue.labels, ${{ inputs.if-labeled }})
+        uses: roc-streaming/ci/actions/update-project@main
         with:
-          organization: "roc-streaming"
-          project_number: ${{ inputs.project }}
-          content_id: ${{ steps.add-item.outputs.itemId }}
-          field: "Status"
-          value: ${{ inputs.column }}
-          github_token: ${{ secrets.triage-token }}
+          number: ${{ inputs.number }}
+          project: ${{ inputs.project }}
+          status: ${{ inputs.set-column }}
+          github-token: ${{ secrets.triage-token }}

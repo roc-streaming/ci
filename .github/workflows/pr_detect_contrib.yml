@@ -24,10 +24,10 @@ jobs:
           github-token: ${{ secrets.triage-token }}
 
       - if: |
-          fromJson(steps.pr-info.outputs.info).pull_request.contrib == 'true'
-        uses: actions-ecosystem/action-add-labels@v1
+          fromJson(steps.pr-info.outputs.info).pull_request.is_contrib == true
+        uses: roc-streaming/ci/actions/update-labels@main
         with:
-          labels: |
-            contribution
           number: ${{ inputs.pr-number }}
-          github_token: ${{ secrets.triage-token }}
+          add-labels: |
+            contribution
+          github-token: ${{ secrets.triage-token }}

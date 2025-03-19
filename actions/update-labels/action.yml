@@ -1,0 +1,20 @@
+name: 'Update labels'
+description: 'Add or remove labels to issue or pull request'
+
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
+  number:
+    description: 'Issue or pull request number'
+    required: true
+  add-labels:
+    description: 'List of labels to add separated by newlines'
+    required: true
+  remove-labels:
+    description: 'List of labels to remove separated by newlines'
+    required: true
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
