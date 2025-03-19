@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [gather-statuses]
     if: |
-      needs.gather-statuses.outputs.with-conflicts != "[]"
+      needs.gather-statuses.outputs.with-conflicts != '[]'
     strategy:
       matrix:
         pr-number: ${{ fromJson(needs.gather-statuses.outputs.with-conflicts) }}
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [gather-statuses]
     if: |
-      needs.gather-statuses.outputs.without-conflicts != "[]"
+      needs.gather-statuses.outputs.without-conflicts != '[]'
     strategy:
       matrix:
         pr-number: ${{ fromJson(needs.gather-statuses.outputs.without-conflicts) }}
