@@ -1,5 +1,5 @@
 packages:
-  - name: dispatch
+  - name: functions
     environment:
       GH_SECRET: ${GH_SECRET}
       GH_TOKEN: ${GH_TOKEN}

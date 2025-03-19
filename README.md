@@ -1,28 +1,35 @@
-# Continuous integration scripts for Roc Toolkit
+# Continuous integration scripts
 
 This repo contains:
 
-- reusable github workflows (`.github/workflows`)
-- custom github actions (`actions`)
-- digital ocean functions for github webhooks (`packages`)
+- reusable GitHub workflows (`.github/workflows`)
+- custom GitHub actions (`actions`)
+- Digital Ocean serverless functions (`packages/functions`)
 - scripts for managing issues and pull requests (`scripts`)
 
-Typical call stack, e.g. for `rocd` repo:
+Typical event handling call stack, e.g. for `rocd` repo:
 
-- github generates event in `rocd` (e.g. when review is submitted)
-- github invokes webhook from `ci`
-- webhook translates event to repository dispatch call in `rocd`
-- repository dispatch triggers some workflow in `rocd`
-- the workflow may call reusable workflows from `ci` and/or github actions from `ci`
-- reusable workflows from `ci` may call github actions from `ci`
+1. GitHub generates event in `rocd` (e.g. `pull_request_review.submitted`).
 
-Webhook is implemented as a digital ocean serverless function. It allows to untie automation from pull request checks and run automation with different permissions.
+2. GitHub invokes webhook, implemented by a digital ocean function in `ci` (`packages/functions/webhook`).
 
-Reusable workflows allow to reduce duplication of github actions stuff across different repositories (e.g. `roc-toolkit` and `rocd`).
+3. Webhook translates event to GitHub repository dispatch call in `rocd` (e.g. to `pull_request_review_submitted`).
 
-Custom actions are primarily used to avoid (or reduce) sharing access tokens with third-party actions.
+4. Repository dispatch triggers some workflow in `rocd` (e.g. to `pr_reviewed.yml`).
 
-Helper scripts in `scripts` directory are used both by github actions and by maintainers locally, e.g. to merge pull requests.
+5. The workflow in `rocd` may call reusable workflows from `ci` to do the actual job (e.g. `roc-streaming/ci/.github/workflows/pr_handle_reviewed.yml`).
+
+6. The workflow from `ci` may, among other things, call custom GitHub actions from `ci` (e.g. `actions/post-comment`).
+
+Some explanations:
+
+- Webhook approach allows to untie automation from pull request checks, run it with different permissions, in different security context and on different branch.
+
+- Reusable workflows allow to reduce duplication of github actions stuff across different repositories (e.g. `roc-toolkit` and `rocd`).
+
+- Custom actions are primarily used to avoid (or reduce) sharing access tokens with third-party actions. Ideally, for all operations with non-default token, we want to use only official actions by GitHub and custom actions from `ci` repo.
+
+- Helper scripts in `scripts` directory are used both by github actions and by maintainers locally, e.g. to merge pull requests.
 
 ## Build actions
 
@@ -51,7 +58,7 @@ make deploy_webhooks
 Determine webhook URL:
 
 ```
-doctl serverless functions get dispatch/webhook --url
+doctl serverless functions get functions/webhook --url
 ```
 
 Send request:
