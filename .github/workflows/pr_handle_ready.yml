@@ -17,8 +17,7 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
-      - name: Remove labels
-        uses: actions-ecosystem/action-remove-labels@v1
+      - uses: actions-ecosystem/action-remove-labels@v1
         with:
           labels: |
             status: work in progress
@@ -26,8 +25,7 @@ jobs:
           number: ${{ inputs.pr-number }}
           github_token: ${{ secrets.triage-token }}
 
-      - name: Add labels
-        uses: actions-ecosystem/action-add-labels@v1
+      - uses: actions-ecosystem/action-add-labels@v1
         with:
           labels: |
             status: ready for review

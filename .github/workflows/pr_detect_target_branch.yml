@@ -17,12 +17,12 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
-      - name: Post comment (wrong branch)
-        if: |
+      - if: |
           github.event.pull_request.base.ref != inputs.base-branch
-        uses: thollander/actions-comment-pull-request@v2
+        uses: roc-streaming/ci/actions/post-comment@main
         with:
-          message: ":robot: Pull request is not targeted to `${{ inputs.base-branch }}`
+          number: ${{ github.event.pull_request.number }}
+          text: ":robot: Pull request is not targeted to `${{ inputs.base-branch }}`
             branch, which is usually wrong.
             \n
             If this was not intentional, please rebase on fresh `${{ inputs.base-branch }}` branch,

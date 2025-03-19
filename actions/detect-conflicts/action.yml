@@ -1,0 +1,17 @@
+name: "Detect pull requests conflicts"
+description: "Returns two lists of pull requests with and without conflicts"
+
+inputs:
+  github-token:
+    description: "GitHub token"
+    required: true
+
+outputs:
+  with-conflicts:
+    description: "List of PR numbers that have conflicts"
+  without-conflicts:
+    description: "List of PR numbers that don't have conflicts"
+
+runs:
+  using: "node20"
+  main: "dist/index.js"

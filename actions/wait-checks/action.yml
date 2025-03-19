@@ -1,0 +1,31 @@
+name: 'Wait pull request checks'
+description: 'Wait untill pull request checks succeed or fail'
+
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
+  number:
+    description: 'Pull request number'
+    required: true
+  workflow:
+    description: 'Workflow name'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      run: |
+        set -e
+        while :; do
+            state=$(${{ github.action_path }}/../../scripts/rgh.py show_pr --json \
+                --repo ${{ github.repository }} ${{ inputs.pr-number }} \
+                | jq -r .actions.${{ inputs.workflow }})"
+            if [ $state = "success" -o $state = "failure" ]; then
+                break
+            fi
+            sleep 0.5
+        done
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}

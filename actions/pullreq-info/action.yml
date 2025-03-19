@@ -1,0 +1,28 @@
+name: 'Pull request info'
+description: 'Fetch pull request information using rgh.py'
+
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
+  number:
+    description: 'Pull request number'
+    required: true
+outputs:
+  info:
+    description: 'Pull request information in JSON'
+    value: ${{ steps.rgh.outputs.info }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: rgh
+      shell: bash
+      run: |
+        set -e
+        info="$(${{ github.action_path }}/../../scripts/rgh.py show_pr --json \
+          --repo ${{ github.repository }} ${{ inputs.number }})"
+        echo "${info}" | jq -C .
+        echo "info=${info}" >> $GITHUB_OUTPUT
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}

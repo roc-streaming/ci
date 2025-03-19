@@ -1,0 +1,17 @@
+name: 'Post comment'
+description: 'Post comment on issue or pull request'
+
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
+  number:
+    description: 'Issue or pull request number'
+    required: true
+  text:
+    description: 'Comment text'
+    required: true
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

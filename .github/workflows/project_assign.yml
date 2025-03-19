@@ -18,8 +18,8 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
+      # add item for *current* issue to project
       - uses: actions/add-to-project@v1.0.2
-        id: addItem
         with:
           project-url: "https://github.com/orgs/roc-streaming/projects/${{ inputs.project }}"
           github-token: ${{ secrets.triage-token }}
