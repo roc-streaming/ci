@@ -270,7 +270,8 @@ def query_issue_info(org, repo, issue_number):
     else:
         issue_info['issue_milestone'] = None
 
-    issue_info['issue_labels'] = [label['name'] for label in response['labels']]
+    issue_info['issue_labels'] = list(sorted(
+        [label['name'] for label in response['labels']]))
 
     return issue_info
 
@@ -314,15 +315,8 @@ def query_pr_info(org, repo, pr_number, no_git=False):
     else:
         pr_info['pr_milestone'] = None
 
-    pr_info['pr_labels'] = [label['name'] for label in response['labels']]
-
-    try:
-        subprocess.run(
-            ['gh', 'api', f'/orgs/{org}/members/'+pr_info['pr_author']],
-            capture_output=True, text=True, check=True)
-        pr_info['pr_contrib'] = False
-    except subprocess.CalledProcessError as e:
-        pr_info['pr_contrib'] = True
+    pr_info['pr_labels'] = list(sorted(
+        [label['name'] for label in response['labels']]))
 
     pr_info['issue_link'] = None
 
@@ -436,6 +430,37 @@ def query_pr_commits(org, repo, pr_number, no_git=False):
 
     return results
 
+@functools.cache
+def query_pr_author(org, repo, pr_number, no_git=False):
+    pr_info = query_pr_info(org, repo, pr_number, no_git)
+
+    author_info = {}
+
+    try:
+        subprocess.run(
+            ['gh', 'api', f'/orgs/{org}/members/'+pr_info['pr_author']],
+            capture_output=True, text=True, check=True)
+        author_info['is_contrib'] = False
+    except subprocess.CalledProcessError as e:
+        author_info['is_contrib'] = True
+
+    try:
+       n_pullreqs = int(subprocess.check_output(
+            ['gh', 'pr', 'list',
+             '--repo', f'{org}/{repo}',
+             '--author', pr_info['pr_author'],
+             '--state', 'merged',
+             '--json', 'number',
+             '--jq', 'length',
+             ],
+            text=True))
+    except subprocess.CalledProcessError as e:
+        pass
+
+    author_info['is_first'] = n_pullreqs == 0
+
+    return author_info
+
 # find commit in target branch from which PR's branch was forked
 @functools.cache
 def find_pr_fork_point(org, repo, pr_number):
@@ -460,6 +485,7 @@ def build_pr_json(org, repo, pr_number):
     pr_info = query_pr_info(org, repo, pr_number, no_git=True)
     pr_actions = query_pr_actions(org, repo, pr_number, no_git=True)
     pr_commits = query_pr_commits(org, repo, pr_number, no_git=True)
+    pr_author = query_pr_author(org, repo, pr_number, no_git=True)
 
     result = OrderedDict()
 
@@ -473,7 +499,6 @@ def build_pr_json(org, repo, pr_number):
         ('target_branch', pr_info['target_branch']),
         ('state', pr_info['pr_state']),
         ('is_draft', pr_info['pr_draft']),
-        ('is_contrib', pr_info['pr_contrib']),
         ('is_mergeable', pr_info['pr_mergeable']),
         ('is_rebaseable', pr_info['pr_rebaseable']),
         ])
@@ -488,6 +513,11 @@ def build_pr_json(org, repo, pr_number):
         ])
     else:
         result['linked_issue'] = None
+
+    result['author'] = OrderedDict([
+        ('is_contrib', pr_author['is_contrib']),
+        ('is_first', pr_author['is_first']),
+    ])
 
     result['review'] = OrderedDict([
         ('requested', pr_info['review_requested']),
@@ -594,9 +624,6 @@ def show_pr(org, repo, pr_number, show_json):
             if not v: color = Fore.MAGENTA
             else: color = Fore.RED
             v = str(v).lower()
-        elif k == 'is_contrib':
-            color = Fore.MAGENTA
-            v = str(v).lower()
         elif k == 'is_mergeable' or k == 'is_rebaseable':
             if v: color = Fore.MAGENTA
             else: color = Fore.RED
@@ -624,6 +651,15 @@ def show_pr(org, repo, pr_number, show_json):
             print_kv(k, v, color, depth=1)
     else:
         print_text('none', Fore.RED, depth=1)
+
+    print_text('author:', Fore.GREEN, depth=0)
+
+    for k, v in js['author'].items():
+        color = Fore.MAGENTA
+        if v:
+            color = Fore.YELLOW
+        v = str(v).lower()
+        print_kv(k, v, color, depth=1)
 
     print_text('review:', Fore.GREEN, depth=0)
 

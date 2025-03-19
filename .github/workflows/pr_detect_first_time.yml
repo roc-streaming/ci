@@ -3,9 +3,9 @@ name: "pr_detect_first_time"
 on:
   workflow_call:
     inputs:
-      base-branch:
-        type: string
-        default: main
+      pr-number:
+        required: true
+        type: number
     secrets:
       triage-token:
         required: true
@@ -17,10 +17,18 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
-      - uses: plbstl/first-contribution@v3
+      - uses: roc-streaming/ci/actions/pullreq-info@main
+        id: pr-info
         with:
-          labels: contribution
-          pr-opened-msg: |
+          number: ${{ inputs.pr-number }}
+          github-token: ${{ secrets.triage-token }}
+
+      - if: |
+          fromJson(steps.pr-info.outputs.info).author.is_first == true
+        uses: roc-streaming/ci/actions/post-comment@main
+        with:
+          number: ${{ matrix.pr-number }}
+          text: |
             :robot: Welcome! Thanks for your interest in contributing to the project!
 
             Here is a short check-list to help you get started:
@@ -28,7 +36,7 @@ jobs:
              **Creating pull request**
 
              - Target PR to ${{ inputs.base-branch }} branch.
-             - Reference related issue in PR description.
+             - Include link to related issue in PR description.
              - Ensure all CI checks pass.
 
              **Code review**
@@ -38,4 +46,4 @@ jobs:
              - Re-request review after addressing all discussions.
 
              Refer to [contribution guidelines](https://roc-streaming.org/toolkit/docs/development/contribution_guidelines.html) for futher details.
-          token: ${{ secrets.triage-token }}
+          github-token: ${{ secrets.triage-token }}

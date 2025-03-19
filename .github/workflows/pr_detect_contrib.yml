@@ -24,7 +24,7 @@ jobs:
           github-token: ${{ secrets.triage-token }}
 
       - if: |
-          fromJson(steps.pr-info.outputs.info).pull_request.is_contrib == true
+          fromJson(steps.pr-info.outputs.info).author.is_contrib == true
         uses: roc-streaming/ci/actions/update-labels@main
         with:
           number: ${{ inputs.pr-number }}
