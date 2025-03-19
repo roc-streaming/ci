@@ -27,6 +27,21 @@ func Main(args map[string]any) map[string]any {
 		return makeErr("bad request: missing http")
 	}
 
+	headers, ok := httpArg["headers"].(map[string]any)
+	if !ok {
+		return makeErr("bad request: missing http.headers")
+	}
+
+	ghSignature, ok := headers["x-hub-signature-256"].(string)
+	if enableEncryption && !ok {
+		return makeErr("bad request: missing http.headers.x-hub-signature-256")
+	}
+
+	ghEvent, ok := headers["x-github-event"].(string)
+	if !ok {
+		return makeErr("bad request: missing http.headers.x-github-event")
+	}
+
 	queryStr, ok := httpArg["queryString"].(string)
 	if !ok {
 		return makeErr("bad request: missing http.queryString")
@@ -54,21 +69,6 @@ func Main(args map[string]any) map[string]any {
 		if err != nil {
 			return makeErr("can't decrypt GH_TOKEN")
 		}
-	}
-
-	headers, ok := httpArg["headers"].(map[string]any)
-	if !ok {
-		return makeErr("bad request: missing http.headers")
-	}
-
-	ghSignature, ok := headers["x-hub-signature-256"].(string)
-	if enableEncryption && !ok {
-		return makeErr("bad request: missing http.headers.x-hub-signature-256")
-	}
-
-	ghEvent, ok := headers["x-github-event"].(string)
-	if !ok {
-		return makeErr("bad request: missing http.headers.x-github-event")
 	}
 
 	body, ok := httpArg["body"].(string)
@@ -132,17 +132,17 @@ func Main(args map[string]any) map[string]any {
 	switch ghEvent {
 	case "pull_request":
 		switch ghAction {
-		case "opened", "reopened", "closed",
+		case "opened", "reopened", "closed", "synchronize",
 			"ready_for_review", "converted_to_draft",
 			"review_requested", "review_request_removed":
 			dispEvent = "pull_request_" + ghAction
 		}
-
 	case "pull_request_review":
 		dispEvent = "pull_request_review_" + ghAction
+	}
 
-	default:
-		return makeErr("bad request: unexpected event %s/%s", ghEvent, ghAction)
+	if dispEvent == "" {
+		return makeErr("bad request: unsupported event %s/%s", ghEvent, ghAction)
 	}
 
 	dispReqURL := fmt.Sprintf("https://api.github.com/repos/%s/dispatches", repoName)
@@ -240,6 +240,7 @@ func makeErr(message string, args ...any) map[string]any {
 		formattedMessage = fmt.Sprintf(message, args...)
 	}
 	return map[string]any{
+		"statusCode": http.StatusBadRequest,
 		"body": map[string]any{
 			"error": formattedMessage,
 		},
