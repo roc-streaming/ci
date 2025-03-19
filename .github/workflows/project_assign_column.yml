@@ -34,7 +34,7 @@ jobs:
           github-token: ${{ secrets.triage-token }}
 
       - if: |
-          contains(fromJson(steps.issue-info.outputs.info).issue.labels, ${{ inputs.if-labeled }})
+          contains(fromJson(steps.issue-info.outputs.info).issue.labels, inputs.if-labeled)
         uses: roc-streaming/ci/actions/update-project@main
         with:
           number: ${{ inputs.number }}
