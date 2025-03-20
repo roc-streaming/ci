@@ -7,6 +7,7 @@ build_actions:
 	cd actions/update-project && ncc -qs build index.js
 
 build_functions:
+	cd packages/functions/keepalive && go build -o /dev/null -tags=build_main .
 	cd packages/functions/redispatch && go build -o /dev/null -tags=build_main .
 
 deploy_functions:

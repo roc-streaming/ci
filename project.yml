@@ -4,6 +4,9 @@ packages:
       GH_SECRET: ${GH_SECRET}
       GH_TOKEN: ${GH_TOKEN}
     functions:
+      - name: keepalive
+        runtime: go:1.20
+        web: raw
       - name: redispatch
         runtime: go:1.20
         web: raw

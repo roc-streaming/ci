@@ -24,39 +24,42 @@ const enableEncryption = true
 func Main(args map[string]any) map[string]any {
 	httpArg, ok := args["http"].(map[string]any)
 	if !ok {
-		return makeErr("bad request: missing http")
+		return makeErr(http.StatusBadRequest, "bad request: missing http")
 	}
 
 	// parse headers
 	headers, ok := httpArg["headers"].(map[string]any)
 	if !ok {
-		return makeErr("bad request: missing http.headers")
+		return makeErr(http.StatusBadRequest, "bad request: missing http.headers")
 	}
 
 	ghSignature, ok := headers["x-hub-signature-256"].(string)
 	if enableEncryption && !ok {
-		return makeErr("bad request: missing http.headers.x-hub-signature-256")
+		return makeErr(http.StatusBadRequest,
+			"bad request: missing http.headers.x-hub-signature-256")
 	}
 
 	ghEvent, ok := headers["x-github-event"].(string)
 	if !ok {
-		return makeErr("bad request: missing http.headers.x-github-event")
+		return makeErr(http.StatusBadRequest,
+			"bad request: missing http.headers.x-github-event")
 	}
 
 	// parse query
 	queryStr, ok := httpArg["queryString"].(string)
 	if !ok {
-		return makeErr("bad request: missing http.queryString")
+		return makeErr(http.StatusBadRequest, "bad request: missing http.queryString")
 	}
 
 	query, err := url.ParseQuery(queryStr)
 	if err != nil {
-		return makeErr("bad request: can't decode http.queryString: %s", err)
+		return makeErr(http.StatusBadRequest,
+			"bad request: can't decode http.queryString: %s", err)
 	}
 
 	ghKey := query.Get("key")
 	if ghKey == "" {
-		return makeErr("bad request: missing http.queryString.key")
+		return makeErr(http.StatusBadRequest, "bad request: missing http.queryString.key")
 	}
 
 	// decrypt .env using ?key=... from github
@@ -66,58 +69,59 @@ func Main(args map[string]any) map[string]any {
 	if enableEncryption {
 		ghSecret, err = decryptAesCbc(ghSecret, ghKey)
 		if err != nil {
-			return makeErr("can't decrypt GH_SECRET")
+			return makeErr(http.StatusForbidden, "can't decrypt GH_SECRET")
 		}
 		ghToken, err = decryptAesCbc(ghToken, ghKey)
 		if err != nil {
-			return makeErr("can't decrypt GH_TOKEN")
+			return makeErr(http.StatusForbidden, "can't decrypt GH_TOKEN")
 		}
 	}
 
 	// get body
 	body, ok := httpArg["body"].(string)
 	if !ok {
-		return makeErr("bad request: missing http.body")
+		return makeErr(http.StatusBadRequest, "bad request: missing http.body")
 	}
 
 	isBase64, _ := httpArg["isBase64Encoded"].(bool)
 	if isBase64 {
 		b, err := base64.StdEncoding.DecodeString(body)
 		if err != nil {
-			return makeErr("bad request: can't decode http.body: %s", err)
+			return makeErr(http.StatusBadRequest,
+				"bad request: can't decode http.body: %s", err)
 		}
 		body = string(b)
 	}
 
 	// verify body signature with decrypted github secret
 	if enableEncryption && !verifyHmac(body, ghSignature, ghSecret) {
-		return makeErr("bad request: can't validate http.body")
+		return makeErr(http.StatusForbidden, "can't validate http.body")
 	}
 
 	// parse body
 	var payload map[string]any
 	if err := json.Unmarshal([]byte(body), &payload); err != nil {
-		return makeErr("bad request: can't parse http.body: %s", err)
+		return makeErr(http.StatusBadRequest, "bad request: can't parse http.body: %s", err)
 	}
 
 	ghAction, ok := payload["action"].(string)
 	if !ok {
-		return makeErr("bad request: missing body.action")
+		return makeErr(http.StatusBadRequest, "bad request: missing body.action")
 	}
 
 	repo, ok := payload["repository"].(map[string]any)
 	if !ok {
-		return makeErr("bad request: missing body.repository")
+		return makeErr(http.StatusBadRequest, "bad request: missing body.repository")
 	}
 
 	repoName, ok := repo["full_name"].(string)
 	if !ok {
-		return makeErr("bad request: missing body.repository.full_name")
+		return makeErr(http.StatusBadRequest, "bad request: missing body.repository.full_name")
 	}
 
 	// safety check
 	if !strings.HasPrefix(repoName, "roc-streaming/") {
-		return makeErr("bad request: unexpected repository")
+		return makeErr(http.StatusBadRequest, "bad request: unexpected repository")
 	}
 
 	// pull request or issue number (depending on event type)
@@ -126,26 +130,26 @@ func Main(args map[string]any) map[string]any {
 	if strings.HasPrefix(ghEvent, "pull_request") {
 		pullreq, ok := payload["pull_request"].(map[string]any)
 		if !ok {
-			return makeErr("bad request: missing body.pull_request")
+			return makeErr(http.StatusBadRequest, "bad request: missing body.pull_request")
 		}
 		number, ok = pullreq["number"].(float64)
 		if !ok {
-			return makeErr("bad request: missing body.pull_request.number")
+			return makeErr(http.StatusBadRequest, "bad request: missing body.pull_request.number")
 		}
 		if number <= 0 {
-			return makeErr("bad request: invalid body.pull_request.number")
+			return makeErr(http.StatusBadRequest, "bad request: invalid body.pull_request.number")
 		}
 	} else {
 		issue, ok := payload["issue"].(map[string]any)
 		if !ok {
-			return makeErr("bad request: missing body.issue")
+			return makeErr(http.StatusBadRequest, "bad request: missing body.issue")
 		}
 		number, ok = issue["number"].(float64)
 		if !ok {
-			return makeErr("bad request: missing body.issue.number")
+			return makeErr(http.StatusBadRequest, "bad request: missing body.issue.number")
 		}
 		if number <= 0 {
-			return makeErr("bad request: invalid body.issue.number")
+			return makeErr(http.StatusBadRequest, "bad request: invalid body.issue.number")
 		}
 	}
 
@@ -174,7 +178,8 @@ func Main(args map[string]any) map[string]any {
 	}
 
 	if dispEvent == "" {
-		return makeErr("bad request: unsupported event %s/%s", ghEvent, ghAction)
+		return makeErr(http.StatusAccepted,
+			"ignoring request: unsupported event %s/%s", ghEvent, ghAction)
 	}
 
 	// build repository_dispatch request
@@ -195,23 +200,31 @@ func Main(args map[string]any) map[string]any {
 	// send request
 	dispResp, err := http.DefaultClient.Do(dispReq)
 	if err != nil {
-		return makeErr("dispatch request failed: " + err.Error())
+		return makeErr(http.StatusBadGateway, "dispatch request failed: "+err.Error())
 	}
 	defer dispResp.Body.Close()
 
 	dispRespBody, _ := io.ReadAll(dispResp.Body)
 
+	statusCode := dispResp.StatusCode
+	if statusCode == http.StatusNoContent {
+		statusCode = http.StatusOK
+	}
+
 	// forward response and some info to caller
 	return map[string]any{
+		"statusCode": statusCode,
 		"body": map[string]any{
-			"event":             ghEvent,
-			"action":            ghAction,
-			"repo":              repoName,
-			"number":            number,
-			"dispatch_url":      dispReqURL,
-			"dispatch_request":  dispReqBody,
-			"dispatch_status":   dispResp.Status,
-			"dispatch_response": string(dispRespBody),
+			"event":  ghEvent,
+			"action": ghAction,
+			"repo":   repoName,
+			"number": number,
+			"dispatch": map[string]any{
+				"url":             dispReqURL,
+				"request":         dispReqBody,
+				"response_status": dispResp.Status,
+				"response_body":   string(dispRespBody),
+			},
 		},
 	}
 }
@@ -269,13 +282,13 @@ func decryptAesCbc(encryptedData, passphrase string) (string, error) {
 	return result, nil
 }
 
-func makeErr(message string, args ...any) map[string]any {
+func makeErr(status int, message string, args ...any) map[string]any {
 	formattedMessage := message
 	if len(args) > 0 {
 		formattedMessage = fmt.Sprintf(message, args...)
 	}
 	return map[string]any{
-		"statusCode": http.StatusBadRequest,
+		"statusCode": status,
 		"body": map[string]any{
 			"error": formattedMessage,
 		},
