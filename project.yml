@@ -1,12 +1,21 @@
 packages:
   - name: functions
+
     environment:
       GH_SECRET: ${GH_SECRET}
       GH_TOKEN: ${GH_TOKEN}
+
     functions:
       - name: keepalive
         runtime: go:1.20
         web: raw
+        limits:
+          timeout: 10000
+          memory: 512
+
       - name: redispatch
         runtime: go:1.20
         web: raw
+        limits:
+          timeout: 10000
+          memory: 512

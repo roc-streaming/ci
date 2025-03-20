@@ -85,3 +85,50 @@ echo '{"action": "submitted",
        "pull_request": {"number": 123}}' \
     | http POST <url> x-github-event:pull_request_review
 ```
+
+Determine function URL:
+
+```
+doctl sls fn get functions/keepalive --url
+```
+
+Send request:
+
+```
+echo '{"action": "completed",
+       "repository": {"full_name": "roc-streaming/rocd"}}' \
+    | http POST <url> x-github-event:workflow_run
+```
+
+## Test stubs
+
+Emulate request:
+
+```
+printf '{"http": {
+         "headers": {"x-github-event": "workflow_run"},
+         "queryString": "<query>",
+         "isBase64Encoded": true,
+         "body": "%s"}}' \
+       "$(echo '{"action": "submitted",
+                 "repository": {"full_name": "roc-streaming/rocd"},
+                 "pull_request": {"number": 123}}' \
+           | base64 | tr -d '\n')" \
+    | ./packages/functions/keepalive/stub \
+    | jq -C .
+```
+
+Emulate request:
+
+```
+printf '{"http": {
+         "headers": {"x-github-event": "workflow_run"},
+         "queryString": "<query>",
+         "isBase64Encoded": true,
+         "body": "%s"}}' \
+       "$(echo '{"action": "completed",
+                 "repository": {"full_name": "roc-streaming/rocd"}}' \
+           | base64 | tr -d '\n')" \
+    | ./packages/functions/keepalive/stub \
+    | jq -C .
+```

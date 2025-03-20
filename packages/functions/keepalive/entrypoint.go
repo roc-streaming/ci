@@ -16,9 +16,10 @@ import (
 	"strings"
 
 	"golang.org/x/crypto/pbkdf2"
+	"gopkg.in/yaml.v3"
 )
 
-const enableEncryption = true
+const enableVerification = true
 
 func Main(args map[string]any) map[string]any {
 	httpArg, ok := args["http"].(map[string]any)
@@ -33,7 +34,7 @@ func Main(args map[string]any) map[string]any {
 	}
 
 	ghSignature, ok := headers["x-hub-signature-256"].(string)
-	if enableEncryption && !ok {
+	if enableVerification && !ok {
 		return makeErr(http.StatusBadRequest,
 			"bad request: missing http.headers.x-hub-signature-256")
 	}
@@ -62,18 +63,13 @@ func Main(args map[string]any) map[string]any {
 	}
 
 	// decrypt .env using ?key=... from github
-	ghSecret := os.Getenv("GH_SECRET")
-	ghToken := os.Getenv("GH_TOKEN")
-
-	if enableEncryption {
-		ghSecret, err = decryptAesCbc(ghSecret, ghKey)
-		if err != nil {
-			return makeErr(http.StatusForbidden, "can't decrypt GH_SECRET")
-		}
-		ghToken, err = decryptAesCbc(ghToken, ghKey)
-		if err != nil {
-			return makeErr(http.StatusForbidden, "can't decrypt GH_TOKEN")
-		}
+	ghSecret, err := decryptAesCbc(os.Getenv("GH_SECRET"), ghKey)
+	if err != nil {
+		return makeErr(http.StatusForbidden, "can't decrypt GH_SECRET")
+	}
+	ghToken, err := decryptAesCbc(os.Getenv("GH_TOKEN"), ghKey)
+	if err != nil {
+		return makeErr(http.StatusForbidden, "can't decrypt GH_TOKEN")
 	}
 
 	// get body
@@ -93,7 +89,7 @@ func Main(args map[string]any) map[string]any {
 	}
 
 	// verify body signature with decrypted github secret
-	if enableEncryption && !verifyHmac(body, ghSignature, ghSecret) {
+	if enableVerification && !verifyHmac(body, ghSignature, ghSecret) {
 		return makeErr(http.StatusForbidden, "can't validate http.body")
 	}
 
@@ -150,6 +146,7 @@ type workflow struct {
 	ID    int    `json:"id"`
 	Name  string `json:"name"`
 	State string `json:"state"`
+	Path  string `json:"path"`
 }
 
 type workflowList struct {
@@ -168,90 +165,141 @@ type workflowList struct {
 func keepaliveWorkflows(repo, token string) ([]string, error) {
 	enabledWorkflows := []string{}
 
-	workflows, err := listWorkflows(repo, token)
+	workflows, err := readWorkflowList(repo, token)
 	if err != nil {
 		return nil, fmt.Errorf("can't get workflow list: %w", err)
 	}
 
 	for _, workflow := range workflows {
-		if workflow.State == "active" || workflow.State == "disabled_inactivity" {
-			if err := enableWorkflow(repo, token, workflow.ID); err != nil {
-				return nil, fmt.Errorf("can't enable workflow: %w", err)
-			}
-			enabledWorkflows = append(enabledWorkflows, workflow.Name)
+		if workflow.State != "active" && workflow.State != "disabled_inactivity" {
+			continue
 		}
+
+		if !strings.HasPrefix(workflow.Path, ".github/workflows/") {
+			continue
+		}
+
+		scheduled, err := isWorkflowScheduled(repo, token, workflow.ID)
+		if err != nil {
+			return nil, fmt.Errorf("can't check workflow: %w", err)
+		}
+		if !scheduled {
+			continue
+		}
+
+		if err := enableWorkflow(repo, token, workflow.ID); err != nil {
+			return nil, fmt.Errorf("can't enable workflow: %w", err)
+		}
+		enabledWorkflows = append(enabledWorkflows, workflow.Name)
 	}
 
 	return enabledWorkflows, nil
 }
 
-func listWorkflows(repo, token string) ([]workflow, error) {
+func readWorkflowList(repo, token string) ([]workflow, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/actions/workflows", repo)
 
-	req, err := http.NewRequest("GET", url, nil)
+	respBody, err := githubRequest("GET", url, token, nil)
 	if err != nil {
-		return nil, fmt.Errorf("http request failed: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("http request failed: %w", err)
-	}
-
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("http request failed: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("http request failed with code %s: %s",
-			resp.Status, string(respBody))
+		return nil, fmt.Errorf("failed to retrieve workflow list: %w", err)
 	}
 
 	var response workflowList
 	err = json.Unmarshal(respBody, &response)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse workflow list: %w", err)
 	}
 
 	return response.Workflows, nil
+}
+
+func isWorkflowScheduled(repo, token string, workflowID int) (bool, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/actions/workflows/%d",
+		repo, workflowID)
+
+	workflowResp, err := githubRequest("GET", url, token, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to get workflow: %w", err)
+	}
+
+	var workflow workflow
+	if err := json.Unmarshal(workflowResp, &workflow); err != nil {
+		return false, fmt.Errorf("failed to parse workflow: %w", err)
+	}
+
+	content, err := readWorkflowContent(repo, token, workflow.Path)
+	if err != nil {
+		return false, err
+	}
+
+	on, exists := content["on"]
+	if !exists {
+		return false, nil
+	}
+	if str, ok := on.(string); ok { // "on: schedule"
+		hasSchedule := str == "schedule"
+		return hasSchedule, nil
+	}
+	if onMap, ok := on.(map[string]any); ok { // "on: {schedule: ...}"
+		_, hasSchedule := onMap["schedule"]
+		return hasSchedule, nil
+	}
+
+	return false, nil
+}
+
+func readWorkflowContent(repo, token, path string) (map[string]any, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/contents/%s", repo, path)
+
+	contentResp, err := githubRequest("GET", url, token, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file content: %w", err)
+	}
+
+	var content map[string]any
+	if err := yaml.Unmarshal(contentResp, &content); err != nil {
+		return nil, fmt.Errorf("failed to parse content response: %w", err)
+	}
+
+	return content, nil
 }
 
 func enableWorkflow(repo, token string, workflowID int) error {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/actions/workflows/%d/enable",
 		repo, workflowID)
 
-	req, err := http.NewRequest("PUT", url, nil)
+	_, err := githubRequest("PUT", url, token, nil)
+	return err
+}
+
+func githubRequest(method, url, token string, body io.Reader) ([]byte, error) {
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
+		return nil, fmt.Errorf("http request failed: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Accept", "application/vnd.github.v3+json")
+	req.Header.Add("Accept", "application/vnd.github.v3.raw")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
+		return nil, fmt.Errorf("http request failed: %w", err)
 	}
 
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
+		return nil, fmt.Errorf("http request failed: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("http request failed with code %s: %s",
+		return nil, fmt.Errorf("http request failed with code %s: %s",
 			resp.Status, string(respBody))
 	}
 
-	return nil
+	return respBody, nil
 }
 
 func verifyHmac(ghBody, ghBodySignature, ghSecret string) bool {

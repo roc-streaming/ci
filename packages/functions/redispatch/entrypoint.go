@@ -19,7 +19,7 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
-const enableEncryption = true
+const enableVerification = true
 
 func Main(args map[string]any) map[string]any {
 	httpArg, ok := args["http"].(map[string]any)
@@ -34,7 +34,7 @@ func Main(args map[string]any) map[string]any {
 	}
 
 	ghSignature, ok := headers["x-hub-signature-256"].(string)
-	if enableEncryption && !ok {
+	if enableVerification && !ok {
 		return makeErr(http.StatusBadRequest,
 			"bad request: missing http.headers.x-hub-signature-256")
 	}
@@ -63,18 +63,13 @@ func Main(args map[string]any) map[string]any {
 	}
 
 	// decrypt .env using ?key=... from github
-	ghSecret := os.Getenv("GH_SECRET")
-	ghToken := os.Getenv("GH_TOKEN")
-
-	if enableEncryption {
-		ghSecret, err = decryptAesCbc(ghSecret, ghKey)
-		if err != nil {
-			return makeErr(http.StatusForbidden, "can't decrypt GH_SECRET")
-		}
-		ghToken, err = decryptAesCbc(ghToken, ghKey)
-		if err != nil {
-			return makeErr(http.StatusForbidden, "can't decrypt GH_TOKEN")
-		}
+	ghSecret, err := decryptAesCbc(os.Getenv("GH_SECRET"), ghKey)
+	if err != nil {
+		return makeErr(http.StatusForbidden, "can't decrypt GH_SECRET")
+	}
+	ghToken, err := decryptAesCbc(os.Getenv("GH_TOKEN"), ghKey)
+	if err != nil {
+		return makeErr(http.StatusForbidden, "can't decrypt GH_TOKEN")
 	}
 
 	// get body
@@ -94,7 +89,7 @@ func Main(args map[string]any) map[string]any {
 	}
 
 	// verify body signature with decrypted github secret
-	if enableEncryption && !verifyHmac(body, ghSignature, ghSecret) {
+	if enableVerification && !verifyHmac(body, ghSignature, ghSecret) {
 		return makeErr(http.StatusForbidden, "can't validate http.body")
 	}
 
