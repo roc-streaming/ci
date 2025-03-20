@@ -1,4 +1,4 @@
-all: build_actions
+all: build_actions build_functions
 
 build_actions:
 	cd actions/detect-conflicts && ncc -qs build index.js
@@ -6,5 +6,8 @@ build_actions:
 	cd actions/update-labels && ncc -qs build index.js
 	cd actions/update-project && ncc -qs build index.js
 
-deploy_webhooks:
-	doctl serverless deploy .
+build_functions:
+	cd packages/functions/redispatch && go build -o /dev/null -tags=build_main .
+
+deploy_functions:
+	doctl sls deploy .

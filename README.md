@@ -11,7 +11,7 @@ Typical event handling call stack, e.g. for `rocd` repo:
 
 1. GitHub generates event in `rocd` (e.g. `pull_request_review.submitted`).
 
-2. GitHub invokes webhook, implemented by a digital ocean function in `ci` (`packages/functions/webhook`).
+2. GitHub invokes webhook, implemented by a digital ocean function in `ci` (`packages/functions/redispatch`).
 
 3. Webhook translates event to GitHub repository dispatch call in `rocd` (e.g. to `pull_request_review_submitted`).
 
@@ -31,6 +31,14 @@ Some explanations:
 
 - Helper scripts in `scripts` directory are used both by github actions and by maintainers locally, e.g. to merge pull requests.
 
+## Dev dependencies
+
+- Node.js 1.20+, npm.js
+- Go 1.20+
+- Python 3.9+
+- [ncc](https://www.npmjs.com/package/@vercel/ncc)
+- [doctl](https://docs.digitalocean.com/reference/doctl/how-to/install/)
+
 ## Build actions
 
 Build all github actions:
@@ -39,30 +47,41 @@ Build all github actions:
 make build_actions
 ```
 
-## Deploy webhooks
+## Build functions
 
-Encrypt secret (for `.env` file):
+Build all digital ocean functions:
+
+```
+make build_functions
+```
+
+## Deploy functions
+
+Encrypt a secret (for `.env` file):
 
 ```
 echo -n <secret> | openssl enc -aes-256-cbc -a -salt -pbkdf2 -pass pass:<key> | tr -d '\n'
 ```
 
-Deploy all webhooks:
+Deploy all digital ocean functions:
 
 ```
-make deploy_webhooks
+make deploy_functions
 ```
 
-## Test webhook
+## Test functions
 
-Determine webhook URL:
+Determine function URL:
 
 ```
-doctl serverless functions get functions/webhook --url
+doctl sls fn get functions/redispatch --url
 ```
 
 Send request:
 
 ```
-echo '{"action": "submitted", "repository": {"full_name": "roc-streaming/rocd"}, "pull_request": {"number": 123}}' | http POST <url> x-github-event:pull_request_review
+echo '{"action": "submitted",
+       "repository": {"full_name": "roc-streaming/rocd"},
+       "pull_request": {"number": 123}}' \
+    | http POST <url> x-github-event:pull_request_review
 ```
