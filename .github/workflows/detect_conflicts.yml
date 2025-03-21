@@ -25,32 +25,32 @@ jobs:
         with:
           github-token: ${{ secrets.triage-token }}
 
-      - if: >-
+      - if: |
           steps.pr-statuses.outputs.without-conflicts != '[]'
         uses: roc-streaming/ci/actions/update-labels@main
         with:
-          number: >-
+          number: |
             ${{ join(fromJson(steps.pr-statuses.outputs.without-conflicts), ' ') }}
           remove-labels: |
             status: needs rebase
           github-token: ${{ secrets.triage-token }}
 
-      - if: >-
+      - if: |
           steps.pr-statuses.outputs.with-conflicts != '[]'
         uses: roc-streaming/ci/actions/update-labels@main
         id: add-labels
         with:
-          number: >-
+          number: |
             ${{ join(fromJson(steps.pr-statuses.outputs.with-conflicts), ' ') }}
           add-labels: |
             status: needs rebase
           github-token: ${{ secrets.triage-token }}
 
-      - if: >-
+      - if: |
           steps.add-labels.outputs.updated != '[]'
         uses: roc-streaming/ci/actions/post-comment@main
         with:
-          number: >-
+          number: |
             ${{ join(fromJson(steps.add-labels.outputs.updated), ' ') }}
           text: ":robot: Pull request is currently unmergeable due to conflicts.
             \n
