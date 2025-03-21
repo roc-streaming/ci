@@ -1,7 +1,7 @@
 {
   "name": "post-comment",
   "version": "0.0.0",
-  "main": "src/index.js",
+  "main": "index.js",
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0"
