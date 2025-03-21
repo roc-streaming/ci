@@ -31833,16 +31833,22 @@ const github = __nccwpck_require__(4902);
 async function main() {
   const githubToken = core.getInput("github-token", { required: true });
   const text = core.getInput("text", { required: true });
-  const issueNumber = parseInt(core.getInput("number", { required: true }), 10);
+  const issueNumberList = core.getInput("number", { required: true })
+        .split(/\s+/)
+        .map(n => n.trim())
+        .map(n => parseInt(n, 10))
+        .filter(n => n > 0);
 
   const client = github.getOctokit(githubToken);
 
-  await client.rest.issues.createComment({
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
-    issue_number: issueNumber,
-    body: text,
-  });
+  for (const issueNumber of issueNumberList) {
+    await client.rest.issues.createComment({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      issue_number: issueNumber,
+      body: text,
+    });
+  }
 }
 
 main().catch((error) => {

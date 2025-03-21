@@ -14,79 +14,47 @@ permissions:
   pull-requests: write
 
 jobs:
-  gather-statuses:
+  detect-conflicts:
     if: |
       github.repository_owner == 'roc-streaming'
 
     runs-on: ubuntu-latest
-    outputs:
-      with-conflicts: ${{ steps.pr-statuses.outputs.with-conflicts }}
-      without-conflicts: ${{ steps.pr-statuses.outputs.without-conflicts }}
-
     steps:
       - uses: roc-streaming/ci/actions/detect-conflicts@main
         id: pr-statuses
         with:
           github-token: ${{ secrets.triage-token }}
 
-  add-labels:
-    runs-on: ubuntu-latest
-    needs: [gather-statuses]
-    if: |
-      needs.gather-statuses.outputs.with-conflicts != '[]'
-    strategy:
-      matrix:
-        pr-number: ${{ fromJson(needs.gather-statuses.outputs.with-conflicts) }}
-
-    steps:
-      - uses: roc-streaming/ci/actions/pullreq-info@main
-        id: pr-info
+      - if: >-
+          steps.pr-statuses.outputs.without-conflicts != '[]'
+        uses: roc-streaming/ci/actions/update-labels@main
         with:
-          number: ${{ matrix.pr-number }}
+          number: >-
+            ${{ join(fromJson(steps.pr-statuses.outputs.without-conflicts), ' ') }}
+          remove-labels: |
+            status: needs rebase
           github-token: ${{ secrets.triage-token }}
 
-      - if: |
-          !contains(fromJson(steps.pr-info.outputs.info).pull_request.labels, 'status: needs rebase')
+      - if: >-
+          steps.pr-statuses.outputs.with-conflicts != '[]'
+        uses: roc-streaming/ci/actions/update-labels@main
+        id: add-labels
+        with:
+          number: >-
+            ${{ join(fromJson(steps.pr-statuses.outputs.with-conflicts), ' ') }}
+          add-labels: |
+            status: needs rebase
+          github-token: ${{ secrets.triage-token }}
+
+      - if: >-
+          steps.add-labels.outputs.updated != '[]'
         uses: roc-streaming/ci/actions/post-comment@main
         with:
-          number: ${{ matrix.pr-number }}
+          number: >-
+            ${{ join(fromJson(steps.add-labels.outputs.updated), ' ') }}
           text: ":robot: Pull request is currently unmergeable due to conflicts.
             \n
             Please rebase on fresh `${{ inputs.development-branch }}` branch, resolve merge conflicts,
             and force-push to pull request's branch.
             Remember to use rebase with force-push instead of regular merge."
-          github-token: ${{ secrets.triage-token }}
-
-      - if: |
-          !contains(fromJson(steps.pr-info.outputs.info).pull_request.labels, 'status: needs rebase')
-        uses: roc-streaming/ci/actions/update-labels@main
-        with:
-          number: ${{ matrix.pr-number }}
-          add-labels: |
-            status: needs rebase
-          github-token: ${{ secrets.triage-token }}
-
-  remove-labels:
-    runs-on: ubuntu-latest
-    needs: [gather-statuses]
-    if: >
-      needs.gather-statuses.outputs.without-conflicts != '[]'
-    strategy:
-      matrix:
-        pr-number: ${{ fromJson(needs.gather-statuses.outputs.without-conflicts) }}
-
-    steps:
-      - uses: roc-streaming/ci/actions/pullreq-info@main
-        id: pr-info
-        with:
-          number: ${{ matrix.pr-number }}
-          github-token: ${{ secrets.triage-token }}
-
-      - if: |
-          contains(fromJson(steps.pr-info.outputs.info).pull_request.labels, 'status: needs rebase')
-        uses: roc-streaming/ci/actions/update-labels@main
-        with:
-          number: ${{ matrix.pr-number }}
-          remove-labels: |
-            status: needs rebase
           github-token: ${{ secrets.triage-token }}

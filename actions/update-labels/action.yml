@@ -6,7 +6,7 @@ inputs:
     description: 'GitHub token'
     required: true
   number:
-    description: 'Issue or pull request number'
+    description: 'Issue or pull request number, list of numbers'
     required: true
   add-labels:
     description: 'List of labels to add separated by newlines'
@@ -14,6 +14,9 @@ inputs:
   remove-labels:
     description: 'List of labels to remove separated by newlines'
     required: true
+outputs:
+  updated:
+    description: "List of issue or pull request numbers that were updated"
 
 runs:
   using: 'node20'

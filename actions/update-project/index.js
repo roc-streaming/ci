@@ -4,42 +4,140 @@ const github = require('@actions/github');
 
 async function main() {
   const githubToken = core.getInput("github-token", { required: true });
-  const issueNumber = parseInt(core.getInput("number", { required: true }), 10);
+  const issueNumberList = core.getInput("number", { required: true })
+        .split(/\s+/)
+        .map(n => n.trim())
+        .map(n => parseInt(n, 10))
+        .filter(n => n > 0);
   const projectNumber = parseInt(core.getInput("project", { required: true }));
   const status = (core.getInput("status") || "").trim();
 
   const client = github.getOctokit(token);
 
-  const findIssueResponse = await client.rest.issues.get({
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
-    issue_number: issueNumber,
+  const findProjectQuery = `
+    query($owner: String!, $number: Int!) {
+      organization(login: $owner) {
+        projectV2(number: $number) {
+          id
+        }
+      }
+    }
+  `;
+
+  const findProjectResult = await client.graphql(findProjectQuery, {
+    owner,
+    number: projectNumber
   });
 
-  const contentId = findIssueResponse.data.node_id;
+  const projectId = findProjectResult.organization.projectV2.id;
 
-  core.info(`detected content id: ${contentId}`);
+  core.info(`found project id: ${projectId}`);
 
-  const findProjectQuery = `
-      query($owner: String!, $number: Int!) {
-        organization(login: $owner) {
-          projectV2(number: $number) {
-            id
+  let projectStatusField = null;
+  let projectStatusOption = null;
+
+  if (status) {
+    const findProjectFieldsQuery = `
+      query($project: ID!) {
+        node(id: $project) {
+          ... on ProjectV2 {
+            fields(first: 20) {
+              nodes {
+                ... on ProjectV2Field {
+                  id
+                  name
+                }
+                ... on ProjectV2SingleSelectField {
+                  id
+                  name
+                  options {
+                    id
+                    name
+                  }
+                }
+              }
+            }
           }
         }
       }
     `;
 
-  const findProjectResponse = await client.graphql(findProjectQuery, {
-    owner,
-    number: projectNumber
-  });
+    const findProjectFieldsResult = await client.graphql(findProjectFieldsQuery, {
+      project: projectId,
+    });
 
-  const projectId = findProjectResponse.organization.projectV2.id;
+    projectStatusField = findProjectFieldsResult.node.fields.nodes
+          .find(field => field.name === "Status");
+    if (!projectStatusField) {
+      throw new Error("can't find 'Status' field in project");
+    }
 
-  core.info(`detected project id: ${projectId}`);
+    core.info(`found project status field id: ${projectStatusField.id}`);
 
-  const addItemMutation = `
+    projectStatusOption = projectStatusField.options
+      .find(option => option.name === status);
+    if (!projectStatusOption) {
+      throw new Error(`can't find 'Status' option '${status}' in project`);
+    }
+
+    core.info(`found project status option id: ${projectStatusOption.id}`);
+  }
+
+  let updatedIssues = [];
+
+  for (const issueNumber of issueNumberList) {
+    const findIssueResult = await client.rest.issues.get({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      issue_number: issueNumber,
+    });
+
+    const contentId = findIssueResult.data.node_id;
+
+    core.info(`gh-${issueNumber}: found issue content id: ${contentId}`);
+
+    const checkItemQuery = `
+      query($project: ID!, $content: ID!) {
+        node(id: $project) {
+          ... on ProjectV2 {
+            items(first: 1, filter: {contentId: $content}) {
+              nodes {
+                id
+                fieldValues(first: 1, filter: {field: {id: $field}}) {
+                  nodes {
+                    ... on ProjectV2ItemFieldSingleSelectValue {
+                      field {
+                        ... on ProjectV2SingleSelectField {
+                          id
+                        }
+                      }
+                      optionId
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const checkItemResult = await client.graphql(checkItemQuery, {
+      project: projectId,
+      content: contentId,
+      field: projectStatusField.id,
+    });
+
+    let itemId = null;
+    let optionId = null;
+
+    if (checkItemResult.node.items.nodes.length > 0) {
+      itemId = checkItemResult.node.items.nodes[0].id;
+      optionId = checkItemResult.node.items.nodes[0].optionId;
+    }
+
+    if (itemId) {
+      const addItemMutation = `
       mutation($project: ID!, $content: ID!) {
         addProjectV2ItemById(input: {
           projectId: $project,
@@ -52,85 +150,61 @@ async function main() {
       }
     `;
 
-  const addItemResponse = await client.graphql(addItemMutation, {
-    project: projectId,
-    content: contentId
-  });
+      const addItemResult = await client.graphql(addItemMutation, {
+        project: projectId,
+        content: contentId,
+      });
 
-  const itemId = addItemResponse.addProjectV2ItemById.item.id;
+      itemId = addItemResult.addProjectV2ItemById.item.id;
 
-  core.info(`successfully added project item: item id ${itemId}`);
+      core.info(`gh-${issueNumber}: added project item: item id ${itemId}`);
 
-  if (status) {
-    const findFieldsQuery = `
-        query($project: ID!) {
-          node(id: $project) {
-            ... on ProjectV2 {
-              fields(first: 20) {
-                nodes {
-                  ... on ProjectV2Field {
-                    id
-                    name
-                  }
-                  ... on ProjectV2SingleSelectField {
-                    id
-                    name
-                    options {
-                      id
-                      name
-                    }
-                  }
-                }
+      if (!updatedIssues.includes(issueNumber)) {
+        updatedIssues.push(issueNumber);
+      }
+    } else {
+      core.info(`gh-${issueNumber}: project item already exists: item id ${itemId}`);
+    }
+
+    if (status) {
+      if (optionId != projectStatusOption.id) {
+        const updateStatusMutation = `
+          mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
+            updateProjectV2ItemFieldValue(input: {
+              projectId: $project,
+              itemId: $item,
+              fieldId: $field,
+              value: {
+                singleSelectOptionId: $value
+              }
+            }) {
+              projectV2Item {
+                id
               }
             }
           }
+        `;
+
+        await client.graphql(updateStatusMutation, {
+          project: projectId,
+          item: itemId,
+          field: projectStatusField.id,
+          value: projectStatusOption.id
+        });
+
+        core.info(`gh-${issueNumber}: updated project item status to '${status}'`);
+
+        if (!updatedIssues.includes(issueNumber)) {
+          updatedIssues.push(issueNumber);
         }
-      `;
-
-    const findFieldsResponse = await client.graphql(findFieldsQuery, {
-      project: projectId
-    });
-
-    const statusField = findFieldsResponse.node.fields.nodes.find(field => field.name === "Status");
-    if (!statusField) {
-      throw new Error("can't find 'Status' field in project");
+      } else {
+        core.info(`gh-${issueNumber}: project item status is already '${status}'`);
+      }
     }
-
-    core.info(`detected status field id: ${statusField.id}`);
-
-    const statusOption = statusField.options.find(option => option.name === status);
-    if (!statusOption) {
-      throw new Error(`can't find 'Status' option '${status}' in project`);
-    }
-
-    core.info(`detected status option id: ${statusOption.id}`);
-
-    const updateStatusMutation = `
-        mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
-          updateProjectV2ItemFieldValue(input: {
-            projectId: $project,
-            itemId: $item,
-            fieldId: $field,
-            value: {
-              singleSelectOptionId: $value
-            }
-          }) {
-            projectV2Item {
-              id
-            }
-          }
-        }
-      `;
-
-    await client.graphql(updateStatusMutation, {
-      project: projectId,
-      item: itemId,
-      field: statusField.id,
-      value: statusOption.id
-    });
-
-    core.info(`successfully updated item status`);
   }
+
+  core.info(`updatedIssues: ${updatedIssues}`);
+  core.setOutput("updated", updatedIssues);
 }
 
 main().catch((error) => {

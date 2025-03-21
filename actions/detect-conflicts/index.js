@@ -31,14 +31,14 @@ async function main() {
           }
         }`;
 
-    const response = await client.graphql(query, {
+    const result = await client.graphql(query, {
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
       after: cursor,
     });
 
-    const pullRequests = response.repository.pullRequests.nodes;
-    const pageInfo = response.repository.pullRequests.pageInfo;
+    const pullRequests = result.repository.pullRequests.nodes;
+    const pageInfo = result.repository.pullRequests.pageInfo;
 
     if (pullRequests.length == 0) {
       break;
@@ -67,13 +67,13 @@ async function main() {
               }
             }`;
 
-        const response = await client.graphql(query, {
+        const result = await client.graphql(query, {
           owner: github.context.repo.owner,
           repo: github.context.repo.repo,
           number: parseInt(prNumber, 10),
         });
 
-        prStatus = response.repository.pullRequest.mergeable;
+        prStatus = result.repository.pullRequest.mergeable;
         retryCount++;
 
         core.info(`gh-${prNumber} state: ${prStatus}`);
@@ -98,8 +98,6 @@ async function main() {
 
   core.setOutput("with-conflicts", withConflicts);
   core.setOutput("without-conflicts", withoutConflicts);
-
-  return statuses;
 }
 
 main().catch((error) => {

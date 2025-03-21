@@ -6,7 +6,7 @@ inputs:
     description: 'GitHub token'
     required: true
   number:
-    description: 'Issue or pull request number'
+    description: 'Issue or pull request number, or list of numbers'
     required: true
   text:
     description: 'Comment text'
