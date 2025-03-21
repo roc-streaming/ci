@@ -1,14 +1,14 @@
-name: "pr_detect_stalled"
+name: "detect_stalled"
 
 on:
   workflow_call:
     inputs:
-      stale-days:
+      pr-stale-days:
         type: string
-        default: 180
-      close-days:
+        required: true
+      pr-close-days:
         type: string
-        default: -1
+        required: true
     secrets:
       triage-token:
         required: true
@@ -17,17 +17,20 @@ permissions:
   pull-requests: write
 
 jobs:
-  stale:
+  stale-pull-requests:
+    if: |
+      github.repository_owner == 'roc-streaming'
+
     runs-on: ubuntu-latest
     steps:
       - uses: actions/stale@v9
         with:
           stale-pr-label: "status: stalled"
           stale-pr-message: ":robot: Pull request is automatically marked as stalled
-            because it has been open ${{ inputs.stale-days }} days with no activity."
+            because it has been open ${{ inputs.pr-stale-days }} days with no activity."
           close-pr-message: ":robot: Pull request is automatically closed
-            because it has been open ${{ inputs.close-days }} days with no activity."
-          days-before-stale: ${{ inputs.stale-days }}
-          days-before-close: ${{ inputs.close-days }}
+            because it has been open ${{ inputs.pr-close-days }} days with no activity."
+          days-before-stale: ${{ inputs.pr-stale-days }}
+          days-before-close: ${{ inputs.pr-close-days }}
           remove-stale-when-updated: true
           repo-token: ${{ secrets.triage-token }}

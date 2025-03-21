@@ -1,4 +1,4 @@
-name: "pr_detect_linked_issue"
+name: "pr_status_ready"
 
 on:
   workflow_call:
@@ -14,7 +14,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  main:
+  set-status-ready:
+    if: |
+      github.repository_owner == 'roc-streaming'
+
     runs-on: ubuntu-latest
     steps:
       - uses: roc-streaming/ci/actions/pullreq-info@main
@@ -24,13 +27,14 @@ jobs:
           github-token: ${{ secrets.triage-token }}
 
       - if: |
-          fromJson(steps.pr-info.outputs.info).linked_issue == null
-        uses: roc-streaming/ci/actions/post-comment@main
+          fromJson(steps.pr-info.outputs.info).pull_request.is_draft == false ||
+          fromJson(steps.pr-info.outputs.info).review.requested == true
+        uses: roc-streaming/ci/actions/update-labels@main
         with:
           number: ${{ inputs.pr-number }}
-          text: ":robot: Pull request description does not have a link to an issue.
-            \n
-            If there is a related issue, please add it to the description
-            using any of the [supported formats](https://docs.github.com/en/get-started/\
-            writing-on-github/working-with-advanced-formatting/autolinked-references-and-urls)."
+          remove-labels: |
+            status: work in progress
+            status: needs revision
+          add-labels: |
+            status: ready for review
           github-token: ${{ secrets.triage-token }}

@@ -1,4 +1,4 @@
-name: "project_assign_column"
+name: "project_assign_status"
 
 on:
   workflow_call:
@@ -12,7 +12,7 @@ on:
       if-labeled:
         type: string
         required: true
-      set-column:
+      set-status:
         type: string
         required: true
     secrets:
@@ -24,7 +24,10 @@ permissions:
   issues: write
 
 jobs:
-  main:
+  assign-project-status:
+    if: |
+      github.repository_owner == 'roc-streaming'
+
     runs-on: ubuntu-latest
     steps:
       - uses: roc-streaming/ci/actions/issue-info@main
@@ -39,5 +42,5 @@ jobs:
         with:
           number: ${{ inputs.number }}
           project: ${{ inputs.project }}
-          status: ${{ inputs.set-column }}
+          status: ${{ inputs.set-status }}
           github-token: ${{ secrets.triage-token }}

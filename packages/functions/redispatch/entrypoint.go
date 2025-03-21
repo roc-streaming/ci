@@ -148,7 +148,7 @@ func Main(args map[string]any) map[string]any {
 		}
 	}
 
-	// filter out unneeded events to avoid spamming
+	// filter out unused events to avoid spamming
 	dispEvent := ""
 
 	switch ghEvent {
@@ -164,7 +164,7 @@ func Main(args map[string]any) map[string]any {
 		case "submitted", "edited", "dismissed":
 			dispEvent = "pull_request_review_" + ghAction
 		}
-	case "issue":
+	case "issues":
 		switch ghAction {
 		case "opened", "reopened", "closed",
 			"labeled", "unlabeled":

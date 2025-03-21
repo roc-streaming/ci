@@ -1,4 +1,4 @@
-name: "pr_detect_contrib"
+name: "pr_lint_contrib"
 
 on:
   workflow_call:
@@ -14,7 +14,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  main:
+  lint-contrib:
+    if: |
+      github.repository_owner == 'roc-streaming'
+
     runs-on: ubuntu-latest
     steps:
       - uses: roc-streaming/ci/actions/pullreq-info@main

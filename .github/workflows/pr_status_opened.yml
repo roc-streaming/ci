@@ -1,4 +1,4 @@
-name: "pr_handle_opened"
+name: "pr_status_opened"
 
 on:
   workflow_call:
@@ -15,7 +15,10 @@ permissions:
   checks: read
 
 jobs:
-  main:
+  set-status-opened:
+    if: |
+      github.repository_owner == 'roc-streaming'
+
     runs-on: ubuntu-latest
     steps:
       - uses: roc-streaming/ci/actions/wait-checks@main

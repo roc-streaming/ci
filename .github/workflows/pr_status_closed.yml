@@ -1,4 +1,4 @@
-name: "pr_handle_closed"
+name: "pr_status_closed"
 
 on:
   workflow_call:
@@ -14,7 +14,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  main:
+  set-status-closed:
+    if: |
+      github.repository_owner == 'roc-streaming'
+
     runs-on: ubuntu-latest
     steps:
       - uses: roc-streaming/ci/actions/update-labels@main

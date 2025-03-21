@@ -18,7 +18,10 @@ permissions:
   issues: write
 
 jobs:
-  main:
+  assign-project:
+    if: |
+      github.repository_owner == 'roc-streaming'
+
     runs-on: ubuntu-latest
     steps:
       - uses: roc-streaming/ci/actions/update-project@main

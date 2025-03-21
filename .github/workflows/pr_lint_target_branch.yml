@@ -1,11 +1,11 @@
-name: "pr_detect_target_branch"
+name: "pr_lint_target_branch"
 
 on:
   workflow_call:
     inputs:
-      base-branch:
+      development-branch:
         type: string
-        default: main
+        default: "main"
       pr-number:
         required: true
         type: number
@@ -17,7 +17,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  main:
+  lint-target-branch:
+    if: |
+      github.repository_owner == 'roc-streaming'
+
     runs-on: ubuntu-latest
     steps:
       - uses: roc-streaming/ci/actions/pullreq-info@main
@@ -27,14 +30,14 @@ jobs:
           github-token: ${{ secrets.triage-token }}
 
       - if: |
-          fromJson(steps.pr-info.outputs.info).pull_request.target_branch != inputs.base-branch
+          fromJson(steps.pr-info.outputs.info).pull_request.target_branch != inputs.development-branch
         uses: roc-streaming/ci/actions/post-comment@main
         with:
           number: ${{ inputs.pr-number }}
-          text: ":robot: Pull request is not targeted to `${{ inputs.base-branch }}`
+          text: ":robot: Pull request is not targeted to `${{ inputs.development-branch }}`
             branch, which is usually wrong.
             \n
-            If this was not intentional, please rebase on fresh `${{ inputs.base-branch }}` branch,
+            If this was not intentional, please rebase on fresh `${{ inputs.development-branch }}` branch,
             force-push, and re-target pull request using github web interface.
             Remember to use rebase with force-push instead of regular merge."
           github-token: ${{ secrets.triage-token }}

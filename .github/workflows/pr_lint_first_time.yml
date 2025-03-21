@@ -1,8 +1,14 @@
-name: "pr_detect_first_time"
+name: "pr_lint_first_time"
 
 on:
   workflow_call:
     inputs:
+      development-branch:
+        type: string
+        default: "main"
+      guidelines-link:
+        type: string
+        required: true
       pr-number:
         required: true
         type: number
@@ -14,7 +20,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  main:
+  lint-first-time:
+    if: |
+      github.repository_owner == 'roc-streaming'
+
     runs-on: ubuntu-latest
     steps:
       - uses: roc-streaming/ci/actions/pullreq-info@main
@@ -35,7 +44,7 @@ jobs:
 
              **Creating pull request**
 
-             - Target PR to ${{ inputs.base-branch }} branch.
+             - Target PR to `${{ inputs.development-branch }}` branch.
              - Include link to related issue in PR description.
              - Ensure all CI checks pass.
 
@@ -45,5 +54,5 @@ jobs:
              - Don't resolve discussions by yourself, instead leave a comment or thumbs up.
              - Re-request review after addressing all discussions.
 
-             Refer to [contribution guidelines](https://roc-streaming.org/toolkit/docs/development/contribution_guidelines.html) for futher details.
+             Refer to [contribution guidelines](${{ guidelines-link }}) for futher details.
           github-token: ${{ secrets.triage-token }}

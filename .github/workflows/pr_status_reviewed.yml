@@ -1,4 +1,4 @@
-name: "pr_handle_wip"
+name: "pr_status_reviewed"
 
 on:
   workflow_call:
@@ -14,7 +14,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  main:
+  set-status-reviewed:
+    if: |
+      github.repository_owner == 'roc-streaming'
+
     runs-on: ubuntu-latest
     steps:
       - uses: roc-streaming/ci/actions/pullreq-info@main
@@ -24,14 +27,24 @@ jobs:
           github-token: ${{ secrets.triage-token }}
 
       - if: |
-          fromJson(steps.pr-info.outputs.info).pull_request.is_draft == true ||
-          fromJson(steps.pr-info.outputs.info).review.requested == false
+          fromJson(steps.pr-info.outputs.info).review.decision == 'approved'
         uses: roc-streaming/ci/actions/update-labels@main
         with:
           number: ${{ inputs.pr-number }}
           remove-labels: |
             status: ready for review
+            status: review in progress
             status: needs revision
-          add-labels: |
+          github-token: ${{ secrets.triage-token }}
+
+      - if: |
+          fromJson(steps.pr-info.outputs.info).review.decision == 'changes_requested'
+        uses: roc-streaming/ci/actions/update-labels@main
+        with:
+          number: ${{ inputs.pr-number }}
+          remove-labels: |
+            status: ready for review
             status: work in progress
+          add-labels: |
+            status: needs revision
           github-token: ${{ secrets.triage-token }}
