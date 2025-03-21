@@ -30,7 +30,7 @@ jobs:
           fromJson(steps.pr-info.outputs.info).pull_request.target_branch != inputs.base-branch
         uses: roc-streaming/ci/actions/post-comment@main
         with:
-          number: ${{ github.event.pull_request.number }}
+          number: ${{ inputs.pr-number }}
           text: ":robot: Pull request is not targeted to `${{ inputs.base-branch }}`
             branch, which is usually wrong.
             \n

@@ -22,13 +22,13 @@ jobs:
         id: pr-info
         with:
           workflow: "build"
-          number: ${{ github.event.pull_request.number }}
+          number: ${{ inputs.pr-number }}
           github-token: ${{ secrets.triage-token }}
 
       - uses: roc-streaming/ci/actions/pullreq-info@main
         id: pr-info
         with:
-          number: ${{ github.event.pull_request.number }}
+          number: ${{ inputs.pr-number }}
           github-token: ${{ secrets.triage-token }}
 
       - if: |

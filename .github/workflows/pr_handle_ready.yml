@@ -20,7 +20,7 @@ jobs:
       - uses: roc-streaming/ci/actions/pullreq-info@main
         id: pr-info
         with:
-          number: ${{ github.event.pull_request.number }}
+          number: ${{ inputs.pr-number }}
           github-token: ${{ secrets.triage-token }}
 
       - if: |
