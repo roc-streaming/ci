@@ -14,6 +14,8 @@ async function main() {
   const client = github.getOctokit(githubToken);
 
   for (const issueNumber of issueNumberList) {
+    core.info(`gh-${issueNumber}: posting comment`);
+
     await client.rest.issues.createComment({
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,

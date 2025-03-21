@@ -31880,7 +31880,7 @@ async function main() {
 
       let retryCount = 0;
 
-      while (prStatus === "UNKNOWN" && retryCount < retryMax) {
+      while (prStatus == "UNKNOWN" && retryCount < retryMax) {
         core.info(`gh-${prNumber}: retrying after ${retryAfter} seconds`);
 
         await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
@@ -31921,8 +31921,8 @@ async function main() {
   const withoutConflicts = Object.keys(statuses)
         .filter(prNumber => statuses[prNumber] === "MERGEABLE");
 
-  core.info(`withConflicts: ${withConflicts}`);
-  core.info(`withoutConflicts: ${withoutConflicts}`);
+  core.info(`pull requests with conflicts: ${withConflicts}`);
+  core.info(`pull requests without conflicts: ${withoutConflicts}`);
 
   core.setOutput("with-conflicts", withConflicts);
   core.setOutput("without-conflicts", withoutConflicts);

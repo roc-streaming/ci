@@ -9,11 +9,11 @@ async function main() {
         .map(n => n.trim())
         .map(n => parseInt(n, 10))
         .filter(n => n > 0);
-  const addLabels = (core.getInput("add-labels") || "")
+  const requestedAddLabels = (core.getInput("add-labels") || "")
         .split('/\s+/')
         .map(s => s.trim())
         .filter(s => s);
-  const removeLabels = (core.getInput("remove-labels") || "")
+  const requestedRemoveLabels = (core.getInput("remove-labels") || "")
         .split('/\s+/')
         .map(s => s.trim())
         .filter(s => s);
@@ -30,11 +30,19 @@ async function main() {
     });
 
     const currentLabels = currentLabelsResult.data.map(label => label.name);
-    const labelsToAdd = addLabels.filter(label => !currentLabels.includes(label));
-    const labelsToRemove = removeLabels.filter(label => currentLabels.includes(label));
 
+    const labelsToAdd = requestedAddLabels.filter(label => !currentLabels.includes(label));
+    const labelsNotToAdd = requestedAddLabels.filter(label => currentLabels.includes(label));
+
+    const labelsToRemove = requestedRemoveLabels.filter(label => currentLabels.includes(label));
+    const labelsNotToRemove = requestedRemoveLabels.filter(label => !currentLabels.includes(label));
+
+    if (labelsNotToAdd.length > 0) {
+      core.info(`gh-${issueNumber}: not adding labels because already present: `+
+                labelsNotToAdd.join(', '));
+    }
     if (labelsToAdd.length > 0) {
-      core.info(`gh-${issueNumber}: adding labels: ${labelsToAdd.join(', ')}`);
+      core.info(`gh-${issueNumber}: adding labels: ` + labelsToAdd.join(', '));
       await client.rest.issues.addLabels({
         owner: github.context.repo.owner,
         repo: github.context.repo.repo,
@@ -43,9 +51,13 @@ async function main() {
       });
     }
 
+    if (labelsNotToRemove.length > 0) {
+      core.info(`gh-${issueNumber}: not removing labels because already missing: `+
+                labelsNotToRemove.join(', '));
+    }
     if (labelsToRemove.length > 0) {
+      core.info(`gh-${issueNumber}: removing labels: ` + labelsToRemove.join(', '));
       for (const label of labelsToRemove) {
-        core.info(`gh-${issueNumber}: removing label: ${label}`);
         await client.rest.issues.removeLabel({
           owner: github.context.repo.owner,
           repo: github.context.repo.repo,
@@ -55,12 +67,16 @@ async function main() {
       }
     }
 
+    core.info(`gh-${issueNumber}: `+
+              `added ${labelsToAdd.length}/${requestedAddLabels.length} label(s), `+
+              `removed ${labelsToRemove.length}/${requestedRemoveLabels.length} label(s)`);
+
     if (labelsToAdd.length > 0 || labelsToRemove.length > 0) {
       updatedIssues.push(issueNumber);
     }
   }
 
-  core.info(`updatedIssues: ${updatedIssues}`);
+  core.info(`updated issues: ${updatedIssues}`);
   core.setOutput("updated", updatedIssues);
 }
 

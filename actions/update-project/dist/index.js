@@ -31854,7 +31854,7 @@ async function main() {
 
   const findProjectResult = await client.graphql(findProjectQuery, {
     owner,
-    number: projectNumber
+    number: projectNumber,
   });
 
   const projectId = findProjectResult.organization.projectV2.id;
@@ -31895,7 +31895,7 @@ async function main() {
     });
 
     projectStatusField = findProjectFieldsResult.node.fields.nodes
-          .find(field => field.name === "Status");
+          .find(field => field.name == "Status");
     if (!projectStatusField) {
       throw new Error("can't find 'Status' field in project");
     }
@@ -31903,7 +31903,7 @@ async function main() {
     core.info(`found project status field id: ${projectStatusField.id}`);
 
     projectStatusOption = projectStatusField.options
-      .find(option => option.name === status);
+      .find(option => option.name == status);
     if (!projectStatusOption) {
       throw new Error(`can't find 'Status' option '${status}' in project`);
     }
@@ -31966,17 +31966,17 @@ async function main() {
 
     if (itemId) {
       const addItemMutation = `
-      mutation($project: ID!, $content: ID!) {
-        addProjectV2ItemById(input: {
-          projectId: $project,
-          contentId: $content
-        }) {
-          item {
-            id
+        mutation($project: ID!, $content: ID!) {
+          addProjectV2ItemById(input: {
+            projectId: $project,
+            contentId: $content
+          }) {
+            item {
+              id
+            }
           }
         }
-      }
-    `;
+      `;
 
       const addItemResult = await client.graphql(addItemMutation, {
         project: projectId,
@@ -32031,7 +32031,7 @@ async function main() {
     }
   }
 
-  core.info(`updatedIssues: ${updatedIssues}`);
+  core.info(`updated issues: ${updatedIssues}`);
   core.setOutput("updated", updatedIssues);
 }
 
