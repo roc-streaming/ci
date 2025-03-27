@@ -19,7 +19,7 @@ runs:
       run: |
         set -e
         while :; do
-            state=$(${{ github.action_path }}/../../scripts/rgh.py show_pr --json \
+            state="$(${{ github.action_path }}/../../scripts/rgh.py show_pr --json \
                 --repo ${{ github.repository }} ${{ inputs.pr-number }} \
                 | jq -r .actions.${{ inputs.workflow }})"
             if [ $state = "success" -o $state = "failure" ]; then
