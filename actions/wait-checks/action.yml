@@ -20,7 +20,7 @@ runs:
         set -e
         while :; do
             state="$(${{ github.action_path }}/../../scripts/rgh.py show_pr --json \
-                --repo ${{ github.repository }} ${{ inputs.pr-number }} \
+                --repo ${{ github.repository }} ${{ inputs.number }} \
                 | jq -r .actions.${{ inputs.workflow }})"
             if [ $state = "success" -o $state = "failure" ]; then
                 break
