@@ -1,4 +1,4 @@
-# Continuous integration scripts
+# Roc continuous integration scripts
 
 This repo contains:
 
