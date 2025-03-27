@@ -93,8 +93,8 @@ async function main() {
   const withoutConflicts = Object.keys(statuses)
         .filter(prNumber => statuses[prNumber] === "MERGEABLE");
 
-  core.info(`pull requests with conflicts: ${withConflicts}`);
-  core.info(`pull requests without conflicts: ${withoutConflicts}`);
+  core.info(`pull requests with conflicts: ${withConflicts || "none"}`);
+  core.info(`pull requests without conflicts: ${withoutConflicts || "none"}`);
 
   core.setOutput("with-conflicts", withConflicts);
   core.setOutput("without-conflicts", withoutConflicts);

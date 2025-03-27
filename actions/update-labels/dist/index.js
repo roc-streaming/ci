@@ -31904,7 +31904,7 @@ async function main() {
     }
   }
 
-  core.info(`updated issues: ${updatedIssues}`);
+  core.info(`updated issues: ${updatedIssues || "none"}`);
   core.setOutput("updated", updatedIssues);
 }
 
