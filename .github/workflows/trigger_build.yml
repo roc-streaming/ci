@@ -8,7 +8,7 @@ on:
         required: true
       branch:
         type: string
-        default: main
+        default: "main"
     secrets:
       ci-token:
         required: true
@@ -25,8 +25,9 @@ jobs:
     steps:
       - run: |
           curl -s -X POST \
+            -H 'Authorization: Bearer ${{ secrets.ci-token }}' \
+            -H 'Accept: application/vnd.github.v3+json' \
+            -H 'Content-Type: application/json' \
             'https://api.github.com/repos/roc-streaming/${{ inputs.repo }}/dispatches' \
-            -H 'Accept: application/vnd.github.everest-preview+json' \
-            -u '${{ secrets.ci-token }}' \
             --data \
             '{"event_type": "trigger_build", "client_payload": {"branch": "${{ inputs.branch }}"}}'
