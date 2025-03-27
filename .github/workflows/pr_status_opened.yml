@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: roc-streaming/ci/actions/wait-checks@main
-        id: pr-info
         with:
           workflow: "build"
           number: ${{ inputs.pr-number }}
