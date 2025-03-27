@@ -47,6 +47,7 @@ jobs:
           github-token: ${{ secrets.triage-token }}
 
       - if: |
+          steps.add-labels.outputs.updated != null &&
           steps.add-labels.outputs.updated != '[]'
         uses: roc-streaming/ci/actions/post-comment@main
         with:
