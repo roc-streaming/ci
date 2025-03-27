@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s -X POST \
+          curl -Ls --fail-with-body -X POST \
             -H 'Authorization: Bearer ${{ secrets.ci-token }}' \
             -H 'Accept: application/vnd.github.v3+json' \
             -H 'Content-Type: application/json' \
