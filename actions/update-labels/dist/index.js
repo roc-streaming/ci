@@ -31838,11 +31838,11 @@ async function main() {
         .map(n => parseInt(n, 10))
         .filter(n => n > 0);
   const requestedAddLabels = (core.getInput("add-labels") || "")
-        .split('/\s+/')
+        .split('\n')
         .map(s => s.trim())
         .filter(s => s);
   const requestedRemoveLabels = (core.getInput("remove-labels") || "")
-        .split('/\s+/')
+        .split('\n')
         .map(s => s.trim())
         .filter(s => s);
 
