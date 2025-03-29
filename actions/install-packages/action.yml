@@ -21,22 +21,23 @@ runs:
       shell: bash
       run: |
         requested_packages="$(echo "${{ inputs.packages }}" \
-          | sed 's/[[:space:]]\+/\n/g' | sed '/^$/d' | sed '$a\')"
+          | sed 's/[[:space:]]\+/\n/g' | sed '/^$/d' | tr '\n' ' ')"
         echo \
-          "Requested packages: [$(echo "$requested_packages" | tr '\n' ' ')]"
+          "Requested packages: $requested_packages"
 
-        installed_packages="$(brew list)"
+        installed_packages="$(brew list | tr '\n' ' ')"
         echo \
-          "Installed packages: [$(echo "$installed_packages" | tr '\n' ' ')]"
+          "Installed packages: $installed_packages"
 
-        missing_packages="$(echo "$requested_packages" \
-          | grep -v -f <(echo "$installed_packages"))"
+        missing_packages="$(echo "$requested_packages" | tr ' ' '\n' \
+          | grep -v -f <(echo "$installed_packages" | tr ' ' '\n') \
+          | tr '\n' ' ')"
         echo \
-          "Missing packages: [$(echo "$missing_packages" | tr '\n' ' ')]"
+          "Missing packages: "$missing_packages"
 
-        if [ -n "$missing_packages" ]; then
+        if [[ ! -z "${missing_packages// }" ]]; then
           set -x
-          brew install $(echo "$missing_packages" | tr '\n' ' ')
+          brew install $missing_packages
         else
           echo "All requested packages already installed"
         fi
