@@ -1,0 +1,34 @@
+name: 'Install packages'
+description: 'Install listed packages using brew or apt'
+
+inputs:
+  packages:
+    description: 'List of package names'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install packages (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ${{ inputs.packages }}
+
+    - name: Install packages (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        # filter out packages that are already installed to
+        # suppress brew warnings
+        packages="$(echo "${{ inputs.packages }}" \
+          | sed 's/[[:space:]]\+/\n/g' | sed '/^$/d' | sed '$a\' \
+          | grep -v -f <(brew list))"
+
+        if [ -n "$packages" ]; then
+          set -x
+          brew install packages
+        else
+          echo "All packages already installed"
+        fi
