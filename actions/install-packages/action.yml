@@ -28,7 +28,7 @@ runs:
 
         if [ -n "$packages" ]; then
           set -x
-          brew install packages
+          brew install $packages
         else
           echo "All packages already installed"
         fi
