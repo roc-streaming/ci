@@ -20,15 +20,23 @@ runs:
       if: runner.os == 'macOS'
       shell: bash
       run: |
-        # filter out packages that are already installed to
-        # suppress brew warnings
-        packages="$(echo "${{ inputs.packages }}" \
-          | sed 's/[[:space:]]\+/\n/g' | sed '/^$/d' | sed '$a\' \
-          | grep -v -f <(brew list))"
+        requested_packages="$(echo "${{ inputs.packages }}" \
+          | sed 's/[[:space:]]\+/\n/g' | sed '/^$/d' | sed '$a\')"
+        echo \
+          "Requested packages: [$(echo "$requested_packages" | tr '\n' ' ')]"
 
-        if [ -n "$packages" ]; then
+        installed_packages="$(brew list)"
+        echo \
+          "Installed packages: [$(echo "$installed_packages" | tr '\n' ' ')]"
+
+        missing_packages="$(echo "$requested_packages" \
+          | grep -v -f <(echo "$installed_packages"))"
+        echo \
+          "Missing packages: [$(echo "$missing_packages" | tr '\n' ' ')]"
+
+        if [ -n "$missing_packages" ]; then
           set -x
-          brew install $packages
+          brew install $(echo "$missing_packages" | tr '\n' ' ')
         else
-          echo "All packages already installed"
+          echo "All requested packages already installed"
         fi
