@@ -30,7 +30,7 @@ runs:
           "Installed packages: $installed_packages"
 
         missing_packages="$(echo "$requested_packages" | tr ' ' '\n' \
-          | grep -v -f <(echo "$installed_packages" | tr ' ' '\n') \
+          | ( grep -v -f <(echo "$installed_packages" | tr ' ' '\n') || true ) \
           | tr '\n' ' ')"
         echo \
           "Missing packages: $missing_packages"
