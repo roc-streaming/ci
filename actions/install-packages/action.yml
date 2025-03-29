@@ -13,6 +13,7 @@ runs:
       if: runner.os == 'Linux'
       shell: bash
       run: |
+        set -x
         sudo apt-get update
         sudo apt-get install -y ${{ inputs.packages }}
 
@@ -23,17 +24,17 @@ runs:
         requested_packages="$(echo "${{ inputs.packages }}" \
           | sed 's/[[:space:]]\+/\n/g' | sed '/^$/d' | tr '\n' ' ')"
         echo \
-          "Requested packages: $requested_packages"
+          "Requested packages: $requested_packages" 1>&2
 
         installed_packages="$(brew list | tr '\n' ' ')"
         echo \
-          "Installed packages: $installed_packages"
+          "Installed packages: $installed_packages" 1>&2
 
         missing_packages="$(echo "$requested_packages" | tr ' ' '\n' \
           | ( grep -v -x -f <(echo "$installed_packages" | tr ' ' '\n') || true ) \
           | tr '\n' ' ')"
         echo \
-          "Missing packages: $missing_packages"
+          "Missing packages: $missing_packages" 1>&2
 
         if [[ ! -z "${missing_packages// }" ]]; then
           set -x
