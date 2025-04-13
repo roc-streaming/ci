@@ -16,15 +16,13 @@ runs:
       run: |
         image="$(echo "${{ inputs.image }}" | tr -d '[:space:]')"
         command="${{ inputs.run }}"
-        command="${command//$'\n'/;}"
 
         docker run --rm -t \
           --cap-add SYS_PTRACE \
-          -u "${UID}" \
+          -u "${UID}:${GID}" \
           -v /var/run/docker.sock:/var/run/docker.sock \
           -v ${{ github.workspace }}:/work \
           -w /work \
           -e CI="${CI:-}" \
-          --entrypoint=/bin/bash
           "${image}" \
-          -c "${command}"
+          /bin/bash -c "${command}"
