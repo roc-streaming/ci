@@ -28,7 +28,7 @@ jobs:
       github.event.client_payload.ref ==
         fromJSON(needs.setup.outputs.automation-config).auto_trigger.branch &&
       fromJSON(needs.setup.outputs.automation-config).auto_trigger.rebuild_repos != null &&
-      fromJSON(needs.setup.outputs.automation-config).auto_trigger.rebuild_repos != []
+      toJSON(fromJSON(needs.setup.outputs.automation-config).auto_trigger.rebuild_repos) != '[]'
     runs-on: ubuntu-latest
     steps:
       # trigger builds on dependant repos
