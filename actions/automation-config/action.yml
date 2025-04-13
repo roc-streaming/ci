@@ -37,5 +37,7 @@ runs:
         else:
             config = {}
 
+        print(json.dumps(config, indent=2))
+
         with open(os.getenv("GITHUB_OUTPUT"), "a") as fp:
             fp.write(f"config={json.dumps(config)}\n")

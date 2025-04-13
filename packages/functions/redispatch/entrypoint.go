@@ -71,6 +71,9 @@ func Main(args map[string]any) map[string]any {
 	if err != nil {
 		return makeErr(http.StatusForbidden, "can't decrypt GH_TOKEN")
 	}
+	if !strings.HasPrefix(ghToken, "ghp_") && !strings.HasPrefix(ghToken, "github_pat_") {
+		return makeErr(http.StatusForbidden, "can't validate GH_TOKEN")
+	}
 
 	// get body
 	body, ok := httpArg["body"].(string)
@@ -209,12 +212,13 @@ func Main(args map[string]any) map[string]any {
 		dispReqPayload["ref"] = refName
 	}
 
-	dispReqBody, _ := json.Marshal(map[string]any{
+	dispReqBody := map[string]any{
 		"event_type":     dispEvent,
 		"client_payload": dispReqPayload,
-	})
+	}
+	dispReqBodyBytes, _ := json.Marshal(dispReqBody)
 
-	dispReq, _ := http.NewRequest("POST", dispReqURL, bytes.NewReader(dispReqBody))
+	dispReq, _ := http.NewRequest("POST", dispReqURL, bytes.NewReader(dispReqBodyBytes))
 	dispReq.Header.Set("Authorization", "Bearer "+ghToken)
 	dispReq.Header.Set("Accept", "application/vnd.github.v3+json")
 	dispReq.Header.Set("Content-Type", "application/json")
