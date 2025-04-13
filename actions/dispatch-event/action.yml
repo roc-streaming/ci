@@ -1,0 +1,30 @@
+name: 'Trigger dispatch event'
+description: 'Send specified dispatch event to a repo'
+
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
+  repo:
+    description: 'Space-separated list of repo full names in form <org>/<repo>'
+    required: true
+  event:
+    description: 'Event name'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      run: |
+        echo "${{ inputs.repo }}" | tr -s '[:space:]' '\n' \
+        | while read repo; do
+          echo "sending ${{ inputs.event }} event to ${repo} ..."
+          curl -Ls --fail-with-body -X POST \
+            -H 'Authorization: Bearer ${{ secrets.github-token }}' \
+            -H 'Accept: application/vnd.github.v3+json' \
+            -H 'Content-Type: application/json' \
+            'https://api.github.com/repos/${repo}/dispatches' \
+            --data \
+            '{"event_type": "${{ inputs.event }}", "client_payload": {}}'
+        done

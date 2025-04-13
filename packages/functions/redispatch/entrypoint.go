@@ -119,31 +119,45 @@ func Main(args map[string]any) map[string]any {
 		return makeErr(http.StatusBadRequest, "bad request: unexpected repository")
 	}
 
-	// pull request or issue number (depending on event type)
-	var number float64
+	// pull request or issue issueNumber (for pull_request_xxx and issue_xxx events)
+	var issueNumber float64
+	// branch or tag name (for push_xxx events)
+	var refType, refName string
 
-	if strings.HasPrefix(ghEvent, "pull_request") {
+	switch {
+	case ghEvent == "push":
+		ref, _ := payload["ref"].(string)
+		if strings.HasPrefix(ref, "refs/heads/") {
+			refType = "branch"
+			refName = strings.TrimPrefix(ref, "refs/heads/")
+		} else if strings.HasPrefix(ref, "refs/tags/") {
+			refType = "tag"
+			refName = strings.TrimPrefix(ref, "refs/tags/")
+		}
+
+	case strings.HasPrefix(ghEvent, "pull_request"):
 		pullreq, ok := payload["pull_request"].(map[string]any)
 		if !ok {
 			return makeErr(http.StatusBadRequest, "bad request: missing body.pull_request")
 		}
-		number, ok = pullreq["number"].(float64)
+		issueNumber, ok = pullreq["number"].(float64)
 		if !ok {
 			return makeErr(http.StatusBadRequest, "bad request: missing body.pull_request.number")
 		}
-		if number <= 0 {
+		if issueNumber <= 0 {
 			return makeErr(http.StatusBadRequest, "bad request: invalid body.pull_request.number")
 		}
-	} else {
+
+	default:
 		issue, ok := payload["issue"].(map[string]any)
 		if !ok {
 			return makeErr(http.StatusBadRequest, "bad request: missing body.issue")
 		}
-		number, ok = issue["number"].(float64)
+		issueNumber, ok = issue["number"].(float64)
 		if !ok {
 			return makeErr(http.StatusBadRequest, "bad request: missing body.issue.number")
 		}
-		if number <= 0 {
+		if issueNumber <= 0 {
 			return makeErr(http.StatusBadRequest, "bad request: invalid body.issue.number")
 		}
 	}
@@ -152,6 +166,11 @@ func Main(args map[string]any) map[string]any {
 	dispEvent := ""
 
 	switch ghEvent {
+	case "push":
+		switch refType {
+		case "branch", "tag":
+			dispEvent = "push_" + refType
+		}
 	case "pull_request":
 		switch ghAction {
 		case "opened", "reopened", "closed", "synchronize",
@@ -178,13 +197,21 @@ func Main(args map[string]any) map[string]any {
 	}
 
 	// build repository_dispatch request
-	dispReqURL := fmt.Sprintf("https://api.github.com/repos/%s/dispatches", repoName)
+	dispReqURL := "https://api.github.com/repos/roc-streaming/ci/dispatches"
+
+	dispReqPayload := map[string]any{
+		"repo": repoName,
+	}
+	if issueNumber > 0 {
+		dispReqPayload["number"] = issueNumber
+	}
+	if refName != "" {
+		dispReqPayload["ref"] = refName
+	}
 
 	dispReqBody, _ := json.Marshal(map[string]any{
-		"event_type": dispEvent,
-		"client_payload": map[string]any{
-			"number": number,
-		},
+		"event_type":     dispEvent,
+		"client_payload": dispReqPayload,
 	})
 
 	dispReq, _ := http.NewRequest("POST", dispReqURL, bytes.NewReader(dispReqBody))
@@ -213,10 +240,10 @@ func Main(args map[string]any) map[string]any {
 			"event":  ghEvent,
 			"action": ghAction,
 			"repo":   repoName,
-			"number": number,
 			"dispatch": map[string]any{
-				"url":             dispReqURL,
-				"request":         dispReqBody,
+				"request_url":     dispReqURL,
+				"request_payload": dispReqPayload,
+				"request_body":    dispReqBody,
 				"response_status": dispResp.Status,
 				"response_body":   string(dispRespBody),
 			},

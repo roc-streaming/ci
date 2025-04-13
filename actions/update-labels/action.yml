@@ -5,15 +5,19 @@ inputs:
   github-token:
     description: 'GitHub token'
     required: true
+  repo:
+    description: 'Repo full name in form <org>/<repo>'
+    required: true
   number:
-    description: 'Issue or pull request number, list of numbers'
+    description: 'Issue or pull request number, or space-separated list of numbers'
     required: true
   add-labels:
-    description: 'List of labels to add separated by newlines'
+    description: 'List of labels to add, separated by newlines'
     required: true
   remove-labels:
-    description: 'List of labels to remove separated by newlines'
+    description: 'List of labels to remove, separated by newlines'
     required: true
+
 outputs:
   updated:
     description: "List of issue or pull request numbers that were updated"

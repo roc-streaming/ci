@@ -4,6 +4,7 @@ const github = require('@actions/github');
 
 async function main() {
   const githubToken = core.getInput("github-token", { required: true });
+  const [owner, repo] = core.getInput("repo", { required: true }).split("/");
 
   const client = github.getOctokit(githubToken);
 
@@ -32,8 +33,8 @@ async function main() {
         }`;
 
     const result = await client.graphql(query, {
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
+      owner: owner,
+      repo: repo,
       after: cursor,
     });
 
@@ -68,8 +69,8 @@ async function main() {
             }`;
 
         const result = await client.graphql(query, {
-          owner: github.context.repo.owner,
-          repo: github.context.repo.repo,
+          owner: owner,
+          repo: repo,
           number: parseInt(prNumber, 10),
         });
 

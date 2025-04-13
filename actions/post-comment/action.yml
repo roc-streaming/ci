@@ -5,8 +5,11 @@ inputs:
   github-token:
     description: 'GitHub token'
     required: true
+  repo:
+    description: 'Repo full name in form <org>/<repo>'
+    required: true
   number:
-    description: 'Issue or pull request number, or list of numbers'
+    description: 'Issue or pull request number, or space-separated list of numbers'
     required: true
   text:
     description: 'Comment text'

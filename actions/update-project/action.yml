@@ -5,15 +5,19 @@ inputs:
   github-token:
     description: 'GitHub token'
     required: true
+  repo:
+    description: 'Repo full name in form <org>/<repo>'
+    required: true
   number:
-    description: 'Issue or pull request number, or list of numbers'
+    description: 'Issue or pull request number, or space-separated list of numbers'
     required: true
   project:
     description: 'Project number'
     required: true
-  status:
-    description: 'Optional status in project'
+  label-to-status:
+    description: 'JSON map to automatically set project status (column) based on label'
     required: false
+
 outputs:
   updated:
     description: "List of issue or pull request numbers that were updated"

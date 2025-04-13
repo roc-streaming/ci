@@ -31832,6 +31832,7 @@ const github = __nccwpck_require__(4902);
 
 async function main() {
   const githubToken = core.getInput("github-token", { required: true });
+  const [owner, repo] = core.getInput("repo", { required: true }).split("/");
   const issueNumberList = core.getInput("number", { required: true })
         .split(/\s+/)
         .map(n => n.trim())
@@ -31852,8 +31853,8 @@ async function main() {
 
   for (const issueNumber of issueNumberList) {
     const currentLabelsResult = await client.rest.issues.listLabelsOnIssue({
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
+      owner: owner,
+      repo: repo,
       issue_number: issueNumber,
     });
 
@@ -31872,8 +31873,8 @@ async function main() {
     if (labelsToAdd.length > 0) {
       core.info(`gh-${issueNumber}: adding labels: ` + labelsToAdd.join(', '));
       await client.rest.issues.addLabels({
-        owner: github.context.repo.owner,
-        repo: github.context.repo.repo,
+        owner: owner,
+        repo: repo,
         issue_number: issueNumber,
         labels: labelsToAdd,
       });
@@ -31887,8 +31888,8 @@ async function main() {
       core.info(`gh-${issueNumber}: removing labels: ` + labelsToRemove.join(', '));
       for (const label of labelsToRemove) {
         await client.rest.issues.removeLabel({
-          owner: github.context.repo.owner,
-          repo: github.context.repo.repo,
+          owner: owner,
+          repo: repo,
           issue_number: issueNumber,
           name: label,
         });

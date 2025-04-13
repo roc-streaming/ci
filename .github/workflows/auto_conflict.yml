@@ -1,0 +1,77 @@
+name: "auto_conflict"
+
+on:
+  repository_dispatch:
+    types:
+      - push_branch
+      - pull_request_opened
+      - pull_request_reopened
+      - pull_request_synchronize
+
+jobs:
+  setup:
+    outputs:
+      automation-config: ${{ steps.automation-config.outputs.config }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: roc-streaming/ci/actions/automation-config@main
+        id: automation-config
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          github-token: ${{ secrets.BOT_TOKEN }}
+
+  work:
+    needs: setup
+    if: |
+      fromJSON(needs.setup.outputs.automation-config).auto_status != null
+    runs-on: ubuntu-latest
+    steps:
+      # find pull request with and without conflicts
+      - uses: roc-streaming/ci/actions/detect-conflicts@main
+        id: pr-statuses
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          github-token: ${{ secrets.BOT_TOKEN }}
+
+      # remove 'needs rebase' status label from pull requests without conflicts, if present
+      - if: |
+          steps.pr-statuses.outputs.without-conflicts != '[]'
+        uses: roc-streaming/ci/actions/update-labels@main
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          number: |
+            ${{ join(fromJson(steps.pr-statuses.outputs.without-conflicts), ' ') }}
+          remove-labels: |
+            status: needs rebase
+          github-token: ${{ secrets.BOT_TOKEN }}
+
+      # add 'needs rebase' status label to pull requests with conflicts, if missing
+      - if: |
+          steps.pr-statuses.outputs.with-conflicts != '[]'
+        uses: roc-streaming/ci/actions/update-labels@main
+        id: add-labels
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          number: |
+            ${{ join(fromJson(steps.pr-statuses.outputs.with-conflicts), ' ') }}
+          add-labels: |
+            status: needs rebase
+          github-token: ${{ secrets.BOT_TOKEN }}
+
+      # post comment on pull requests where 'needs rebase' status label was missing
+      # and we added it in previous step
+      - if: |
+          steps.add-labels.outputs.updated != null &&
+          steps.add-labels.outputs.updated != '[]'
+        uses: roc-streaming/ci/actions/post-comment@main
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          number: |
+            ${{ join(fromJson(steps.add-labels.outputs.updated), ' ') }}
+          text: ":robot: Pull request is currently unmergeable due to conflicts.
+            \n
+            Please rebase on up-to-date upstream branch, resolve merge conflicts,
+            and force-push to pull request's branch.
+            Remember to use rebase with force-push instead of a regular merge."
+          github-token: ${{ secrets.BOT_TOKEN }}

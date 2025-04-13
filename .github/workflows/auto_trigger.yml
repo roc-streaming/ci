@@ -1,0 +1,37 @@
+name: "auto_trigger"
+
+on:
+  repository_dispatch:
+    types:
+      - push_branch
+
+jobs:
+  setup:
+    outputs:
+      automation-config: ${{ steps.automation-config.outputs.config }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: roc-streaming/ci/actions/automation-config@main
+        id: automation-config
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          github-token: ${{ secrets.BOT_TOKEN }}
+
+  work:
+    needs: setup
+    if: |
+      fromJSON(needs.setup.outputs.automation-config).auto_trigger != null &&
+      github.event.client_payload.branch ==
+        fromJSON(needs.setup.outputs.automation-config).auto_trigger.branch
+
+    runs-on: ubuntu-latest
+    steps:
+      # trigger builds on dependant repos
+      - uses: roc-streaming/ci/actions/dispatch-event@main
+        with:
+          repo: |
+            ${{ join(fromJSON(needs.setup.outputs.automation-config).auto_trigger.repos, ' ') }}
+          event: |
+            trigger_build
+          github-token: ${{ secrets.BOT_TOKEN }}

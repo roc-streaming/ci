@@ -4,13 +4,14 @@ const github = require('@actions/github');
 
 async function main() {
   const githubToken = core.getInput("github-token", { required: true });
+  const [owner, repo] = core.getInput("repo", { required: true }).split("/");
   const issueNumberList = core.getInput("number", { required: true })
         .split(/\s+/)
         .map(n => n.trim())
         .map(n => parseInt(n, 10))
         .filter(n => n > 0);
   const projectNumber = parseInt(core.getInput("project", { required: true }));
-  const status = (core.getInput("status") || "").trim();
+  const labelToStatus = JSON.parse(core.getInput("label-to-status") || "{}");
 
   const client = github.getOctokit(token);
 
@@ -25,7 +26,7 @@ async function main() {
   `;
 
   const findProjectResult = await client.graphql(findProjectQuery, {
-    owner,
+    owner: owner,
     number: projectNumber,
   });
 
@@ -34,9 +35,8 @@ async function main() {
   core.info(`found project id: ${projectId}`);
 
   let projectStatusField = null;
-  let projectStatusOption = null;
 
-  if (status) {
+  if (labelToStatus.length > 0) {
     const findProjectFieldsQuery = `
       query($project: ID!) {
         node(id: $project) {
@@ -73,24 +73,20 @@ async function main() {
     }
 
     core.info(`found project status field id: ${projectStatusField.id}`);
-
-    projectStatusOption = projectStatusField.options
-      .find(option => option.name == status);
-    if (!projectStatusOption) {
-      throw new Error(`can't find 'Status' option '${status}' in project`);
-    }
-
-    core.info(`found project status option id: ${projectStatusOption.id}`);
   }
 
   let updatedIssues = [];
 
   for (const issueNumber of issueNumberList) {
     const findIssueResult = await client.rest.issues.get({
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
+      owner: owner,
+      repo: repo,
       issue_number: issueNumber,
     });
+
+    const issueLabels = findIssueResult.data.labels;
+
+    core.info(`gh-${issueNumber}: found issue labels: [${issueLabels}]`);
 
     const contentId = findIssueResult.data.node_id;
 
@@ -166,39 +162,50 @@ async function main() {
       core.info(`gh-${issueNumber}: project item already exists: item id ${itemId}`);
     }
 
-    if (status) {
-      if (optionId != projectStatusOption.id) {
-        const updateStatusMutation = `
-          mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
-            updateProjectV2ItemFieldValue(input: {
-              projectId: $project,
-              itemId: $item,
-              fieldId: $field,
-              value: {
-                singleSelectOptionId: $value
-              }
-            }) {
-              projectV2Item {
-                id
+    if (labelToStatus.length > 0) {
+      const issueStatusOption = projectStatusField.options
+            .find(option => issueLabels
+                  .find(label => labelToStatus[label.name] == option.name));
+
+      if (issueStatusOption) {
+        core.info(`gh-${issueNumber}: found status based on label:`+
+                  ` ${issueStatusOption.id} (${issueStatusOption.name})`);
+
+        if (optionId != issueStatusOption.id) {
+          const updateStatusMutation = `
+            mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $project,
+                itemId: $item,
+                fieldId: $field,
+                value: {
+                  singleSelectOptionId: $value
+                }
+              }) {
+                projectV2Item {
+                  id
+                }
               }
             }
+          `;
+
+          await client.graphql(updateStatusMutation, {
+            project: projectId,
+            item: itemId,
+            field: projectStatusField.id,
+            value: issueStatusOption.id
+          });
+
+          core.info(`gh-${issueNumber}: updated project item status to '${status}'`);
+
+          if (!updatedIssues.includes(issueNumber)) {
+            updatedIssues.push(issueNumber);
           }
-        `;
-
-        await client.graphql(updateStatusMutation, {
-          project: projectId,
-          item: itemId,
-          field: projectStatusField.id,
-          value: projectStatusOption.id
-        });
-
-        core.info(`gh-${issueNumber}: updated project item status to '${status}'`);
-
-        if (!updatedIssues.includes(issueNumber)) {
-          updatedIssues.push(issueNumber);
+        } else {
+          core.info(`gh-${issueNumber}: project item status is already '${status}'`);
         }
       } else {
-        core.info(`gh-${issueNumber}: project item status is already '${status}'`);
+        core.info(`gh-${issueNumber}: no suitable status found based on issue labels`);
       }
     }
   }

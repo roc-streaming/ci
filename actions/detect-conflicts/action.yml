@@ -5,6 +5,9 @@ inputs:
   github-token:
     description: "GitHub token"
     required: true
+  repo:
+    description: 'Repo full name in form <org>/<repo>'
+    required: true
 
 outputs:
   with-conflicts:

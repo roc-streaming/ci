@@ -1,0 +1,41 @@
+name: 'Automation config'
+description: 'Retrieve automation config for given repo from /automation.yml'
+
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
+  repo:
+    description: 'Repo full name in form <org>/<repo>'
+    required: true
+
+outputs:
+  config:
+    description: 'Config as JSON string'
+    value: ${{ steps.read-config.outputs.config }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: read-config
+      shell: python
+      run: |
+        ACTION_PATH = "${{ github.action_path }}"
+        REPO = "${{ inputs.repo }}"
+
+        import json
+        import os
+        import sys
+        import yaml
+
+        with open(f"{ACTION_PATH}/../../automation.yml") as fp:
+            repo_configs = yaml.safe_load(fp)
+
+        repo_name = REPO.split("/")[1]
+        if repo_name in repo_configs:
+            config = repo_configs[repo_name]
+        else:
+            config = {}
+
+        with open(os.getenv("GITHUB_OUTPUT"), "a") as fp:
+            fp.write(f"config={json.dumps(config)}\n")

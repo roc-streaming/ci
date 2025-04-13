@@ -5,9 +5,13 @@ inputs:
   github-token:
     description: 'GitHub token'
     required: true
+  repo:
+    description: 'Repo full name in form <org>/<repo>'
+    required: true
   number:
     description: 'Issue number'
     required: true
+
 outputs:
   info:
     description: 'Issue information in JSON'
@@ -21,7 +25,7 @@ runs:
       run: |
         set -e
         info="$(${{ github.action_path }}/../../scripts/rgh.py show_issue --json \
-          --repo ${{ github.repository }} ${{ inputs.number }})"
+          --repo ${{ inputs.repo }} ${{ inputs.number }})"
         echo "${info}" | jq -C .
         echo "info=${info}" >> $GITHUB_OUTPUT
       env:

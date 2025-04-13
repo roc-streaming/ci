@@ -5,6 +5,9 @@ inputs:
   github-token:
     description: 'GitHub token'
     required: true
+  repo:
+    description: 'Repo full name in form <org>/<repo>'
+    required: true
   number:
     description: 'Pull request number'
     required: true
@@ -20,7 +23,7 @@ runs:
         set -e
         while :; do
             state="$(${{ github.action_path }}/../../scripts/rgh.py show_pr --json \
-                --repo ${{ github.repository }} ${{ inputs.number }} \
+                --repo ${{ inputs.repo }} ${{ inputs.number }} \
                 | jq -r .actions.${{ inputs.workflow }})"
             if [ $state = "success" -o $state = "failure" ]; then
                 break

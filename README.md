@@ -2,34 +2,37 @@
 
 This repo contains:
 
-- reusable GitHub workflows (`.github/workflows`)
+- GitHub workflows (`.github/workflows`)
 - custom GitHub actions (`actions`)
 - Digital Ocean serverless functions (`packages/functions`)
 - scripts for managing issues and pull requests (`scripts`)
+- ruleset templates (`rulesets`)
 
 Typical event handling call stack, e.g. for `rocd` repo:
 
-1. GitHub generates event in `rocd` (e.g. `pull_request_review.submitted`).
+1. GitHub generates event in `rocd` repo (e.g. `pull_request_review.submitted`).
 
-2. GitHub invokes webhook, implemented by a digital ocean function in `ci` (`packages/functions/redispatch`).
+2. GitHub invokes webhook, implemented by a Digital Ocean function in `ci` repo (`packages/functions/redispatch`).
 
-3. Webhook translates event to GitHub repository dispatch call in `rocd` (e.g. to `pull_request_review_submitted`).
+3. Webhook translates event to GitHub repository dispatch call in `ci` repo (e.g. to `pull_request_review_submitted`).
 
-4. Repository dispatch triggers some workflow in `rocd` (e.g. to `pr_reviewed.yml`).
+4. Repository dispatch triggers one or a few workflows in `ci` repo (e.g. to `auto_status.yml`).
 
-5. The workflow in `rocd` may call reusable workflows from `ci` to do the actual job (e.g. `roc-streaming/ci/.github/workflows/pr_handle_reviewed.yml`).
+5. The workflows in `ci` repo typically call custom GitHub actions, also from `ci` repo (e.g. `actions/update-labels`).
 
-6. The workflow from `ci` may, among other things, call custom GitHub actions from `ci` (e.g. `actions/post-comment`).
+6. Some of the GitHub actions also use scripts from `scripts` directory in `ci` repo.
 
 Some explanations:
 
-- Webhook approach allows to untie automation from pull request checks, run it with different permissions, in different security context and on different branch.
+- Webhook approach allows to untie automation workflows from pull requests. Such workflows typically require a token with extended privileges. Redispatch reduces the risk of exposing that token to third-party actions and malicious pull requests.
 
-- Reusable workflows allow to reduce duplication of github actions stuff across different repositories (e.g. `roc-toolkit` and `rocd`).
+- Custom actions are primarily used to avoid sharing access tokens with third-party actions. Ideally, in all workflows with non-default token, we want to use only official actions by GitHub and custom actions from `ci` repo.
 
-- Custom actions are primarily used to avoid (or reduce) sharing access tokens with third-party actions. Ideally, for all operations with non-default token, we want to use only official actions by GitHub and custom actions from `ci` repo.
+- Helper scripts in `scripts` directory are used both by GitHub actions and by maintainers locally. E.g. `rgh.py` is used on CI to gather pull request info, and by maintainers to merge pull requests.
 
-- Helper scripts in `scripts` directory are used both by github actions and by maintainers locally, e.g. to merge pull requests.
+Automation workflows (`.github/workflows/auto_xxx.yml`) perform various routine tasks, like setting labels, detecting conflicts, posting welcome messages, etc. This is configured on per-repo basis in `automation.yml` in the project root.
+
+Digital Ocean functions are listed and configured in `project.yml` in the project root. `project.yml` file and `packages` directory are used by `doctl` command.
 
 ## Dev dependencies
 

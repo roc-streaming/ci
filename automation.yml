@@ -1,0 +1,40 @@
+roc-toolkit:
+  auto_welcome:
+    contrib_branch: "develop"
+    contrib_guide: "https://roc-streaming.org/toolkit/docs/development/contribution_guidelines.html"
+
+  auto_status:
+    wait_workflow: "build"
+
+  auto_project:
+    project_id: "5"
+    label_to_column:
+      - label: "help wanted"
+        column: "Help wanted"
+
+  auto_trigger:
+    branch: "master"
+    rebuild_repos:
+      - roc-streaming/roc-go
+      - roc-streaming/roc-java
+      - roc-streaming/roc-pulse
+      - roc-streaming/roc-vad
+      - roc-streaming/rocd
+      - roc-streaming/roc-streaming.github.io
+
+rocd:
+  auto_welcome:
+    contrib_branch: "main"
+    contrib_guide: "https://roc-streaming.org/rocd/hacking/dev_dependencies.html"
+
+  auto_status:
+    wait_workflow: "build"
+
+  auto_project:
+    project_id: "8"
+    label_to_column:
+
+  auto_trigger:
+    branch: "main"
+    rebuild_repos:
+      - roc-streaming/roc-streaming.github.io

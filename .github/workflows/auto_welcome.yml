@@ -1,0 +1,105 @@
+name: "auto_welcome"
+
+on:
+  repository_dispatch:
+    types:
+      - pull_request_opened
+      - pull_request_reopened
+
+jobs:
+  setup:
+    outputs:
+      automation-config: ${{ steps.automation-config.outputs.config }}
+      pr-info: ${{ steps.pr-info.outputs.info }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: roc-streaming/ci/actions/automation-config@main
+        id: automation-config
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          github-token: ${{ secrets.BOT_TOKEN }}
+
+      - uses: roc-streaming/ci/actions/pullreq-info@main
+        id: pr-info
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          number: ${{ github.event.client_payload.number }}
+          github-token: ${{ secrets.BOT_TOKEN }}
+
+  work:
+    needs: setup
+    if: |
+      fromJSON(needs.setup.outputs.automation-config).auto_welcome != null
+    env:
+      contrib_branch: fromJSON(needs.setup.outputs.automation-config).auto_welcome.contrib_branch
+      contrib_guide: fromJSON(needs.setup.outputs.automation-config).auto_welcome.contrib_guide
+
+    runs-on: ubuntu-latest
+    steps:
+      # warn on wrong target branch
+      - if: |
+          fromJSON(needs.setup.outputs.pr-info).pull_request.target_branch != env.contrib_branch
+        uses: roc-streaming/ci/actions/post-comment@main
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          number: ${{ github.event.client_payload.number }}
+          text: ":robot: Pull request is not targeted to `${{ env.contrib_branch }}`
+            branch, which is usually wrong.
+            \n
+            If this was not intentional, please rebase on fresh `${{ env.contrib_branch }}` branch,
+            force-push, and re-target pull request using github web interface.
+            Remember to use rebase with force-push instead of regular merge."
+          github-token: ${{ secrets.BOT_TOKEN }}
+
+      # warn on missing linked issue
+      - if: |
+          fromJSON(needs.setup.outputs.pr-info).linked_issue == null
+        uses: roc-streaming/ci/actions/post-comment@main
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          number: ${{ github.event.client_payload.number }}
+          text: ":robot: Pull request description does not have a link to an issue.
+            \n
+            If there is a related issue, please add it to the description
+            using any of the [supported formats](https://docs.github.com/en/get-started/\
+            writing-on-github/working-with-advanced-formatting/autolinked-references-and-urls)."
+          github-token: ${{ secrets.BOT_TOKEN }}
+
+      # assign 'contribution' label
+      - if: |
+          fromJSON(needs.setup.outputs.pr-info).author.is_contrib == true
+        uses: roc-streaming/ci/actions/update-labels@main
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          number: ${{ github.event.client_payload.number }}
+          add-labels: |
+            contribution
+          github-token: ${{ secrets.BOT_TOKEN }}
+
+      # welcome message on first time contribution
+      - if: |
+          fromJSON(needs.setup.outputs.pr-info).author.is_first == true
+        uses: roc-streaming/ci/actions/post-comment@main
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          number: ${{ github.event.client_payload.number }}
+          text: |
+            :robot: Welcome! Thanks for your interest in contributing to the project!
+
+            Here is a short check-list to help you get started:
+
+             **Creating pull request**
+
+             - Target PR to `${{ env.contrib_branch }}` branch.
+             - Include link to related issue in PR description.
+             - Ensure all CI checks pass.
+
+             **Code review**
+
+             - Mark PR as draft until it's ready. When ready, undraft and request review.
+             - Don't resolve discussions by yourself, instead leave a comment or thumbs up.
+             - Re-request review after addressing all discussions.
+
+             Refer to [contribution guidelines](${{ env.contrib_guide }}) for futher details.
+          github-token: ${{ secrets.BOT_TOKEN }}
