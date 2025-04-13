@@ -20,28 +20,34 @@ jobs:
           repo: ${{ github.event.client_payload.repo }}
           github-token: ${{ secrets.BOT_TOKEN }}
 
-  work:
+  # issue opened
+  on-open:
     needs: setup
     if: |
-      fromJson(needs.setup.outputs.automation-config).auto_project != null
-
+      fromJSON(needs.setup.outputs.automation-config).auto_project != null &&
+      (github.event.action == 'issue_opened' ||
+       github.event.action == 'issue_reopened')
     runs-on: ubuntu-latest
     steps:
-      # assign project when issue is created
-      - if: |
-          github.event.name != 'issue_labeled'
-        uses: roc-streaming/ci/actions/update-project@main
+      # assign project
+      - uses: roc-streaming/ci/actions/update-project@main
         with:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
           project: ${{ fromJSON(needs.setup.outputs.automation-config).auto_project.project_id }}
           github-token: ${{ secrets.BOT_TOKEN }}
 
-      # assign project column (status) based on issue labels
-      - if: |
-          github.event.name == 'issue_labeled' &&
-          fromJSON(needs.setup.outputs.automation-config).auto_project.label_to_column != null
-        uses: roc-streaming/ci/actions/update-project@main
+  # issue labeled
+  on-label:
+    needs: setup
+    if: |
+      fromJSON(needs.setup.outputs.automation-config).auto_project != null &&
+      fromJSON(needs.setup.outputs.automation-config).auto_project.label_to_column != null &&
+      github.event.action == 'issue_labeled'
+    runs-on: ubuntu-latest
+    steps:
+      # assign project column (status) based on labels
+      - uses: roc-streaming/ci/actions/update-project@main
         with:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}

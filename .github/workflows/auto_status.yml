@@ -43,8 +43,8 @@ jobs:
     needs: setup
     if: |
       fromJSON(needs.setup.outputs.automation-config).auto_status != null &&
-      (github.event.name == 'pull_request_opened' ||
-       github.event.name == 'pull_request_reopened')
+      (github.event.action == 'pull_request_opened' ||
+       github.event.action == 'pull_request_reopened')
     runs-on: ubuntu-latest
     steps:
       # wait until build workflow completes
@@ -57,7 +57,7 @@ jobs:
 
       # get pull request info with up-to-date build status
       - uses: roc-streaming/ci/actions/pullreq-info@main
-        id: pr-info
+        id: new-pr-info
         with:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
@@ -65,8 +65,8 @@ jobs:
 
       # if build failed, warn that we're going to set 'work in progress' status
       - if: |
-          fromJSON(steps.pr-info.outputs.info).actions.build == 'failure' &&
-          !contains(toJSON(fromJSON(steps.pr-info.outputs.info).labels), 'status:')
+          fromJSON(steps.new-pr-info.outputs.info).actions.build == 'failure' &&
+          !contains(toJSON(fromJSON(steps.new-pr-info.outputs.info).labels), 'status:')
         uses: roc-streaming/ci/actions/post-comment@main
         with:
           repo: ${{ github.event.client_payload.repo }}
@@ -80,9 +80,9 @@ jobs:
 
       # if pull request is draft, or build failed, set 'work in progress' status label
       - if: |
-          fromJSON(steps.pr-info.outputs.info).pull_request.is_draft == true ||
-          (fromJSON(steps.pr-info.outputs.info).actions.build == 'failure' &&
-           !contains(toJSON(fromJSON(steps.pr-info.outputs.info).labels), 'status:'))
+          fromJSON(steps.new-pr-info.outputs.info).pull_request.is_draft == true ||
+          (fromJSON(steps.new-pr-info.outputs.info).actions.build == 'failure' &&
+           !contains(toJSON(fromJSON(steps.new-pr-info.outputs.info).labels), 'status:'))
         uses: roc-streaming/ci/actions/update-labels@main
         with:
           repo: ${{ github.event.client_payload.repo }}
@@ -94,10 +94,10 @@ jobs:
       # if review was requested, or build succeeded and pull request is not draft,
       # set 'ready for review' status label
       - if: |
-          fromJSON(steps.pr-info.outputs.info).review.requested == true ||
-          (fromJSON(steps.pr-info.outputs.info).pull_request.is_draft == false &&
-           fromJSON(steps.pr-info.outputs.info).actions.build == 'success' &&
-           !contains(toJSON(fromJSON(steps.pr-info.outputs.info).labels), 'status:'))
+          fromJSON(steps.new-pr-info.outputs.info).review.requested == true ||
+          (fromJSON(steps.new-pr-info.outputs.info).pull_request.is_draft == false &&
+           fromJSON(steps.new-pr-info.outputs.info).actions.build == 'success' &&
+           !contains(toJSON(fromJSON(steps.new-pr-info.outputs.info).labels), 'status:'))
         uses: roc-streaming/ci/actions/update-labels@main
         with:
           repo: ${{ github.event.client_payload.repo }}
@@ -111,10 +111,10 @@ jobs:
     needs: setup
     if: |
       fromJSON(needs.setup.outputs.automation-config).auto_status != null &&
-      (github.event.name == 'pull_request_review_request_removed' ||
-       github.event.name == 'pull_request_converted_to_draft') &&
-      (fromJSON(needs.setup.outputs.pr-info).pull_request.is_draft == true ||
-       fromJSON(needs.setup.outputs.pr-info).review.requested == false)
+      ((github.event.action == 'pull_request_review_request_removed' &&
+        fromJSON(needs.setup.outputs.pr-info).review.requested == false) ||
+       (github.event.action == 'pull_request_converted_to_draft') &&
+        fromJSON(needs.setup.outputs.pr-info).pull_request.is_draft == true))
     runs-on: ubuntu-latest
     steps:
       # set 'work in progress' status label
@@ -134,10 +134,10 @@ jobs:
     needs: setup
     if: |
       fromJSON(needs.setup.outputs.automation-config).auto_status != null &&
-      (github.event.name == 'pull_request_review_requested' ||
-       github.event.name == 'pull_request_ready_for_review') &&
-      (fromJSON(needs.setup.outputs.pr-info).pull_request.is_draft == false ||
-       fromJSON(needs.setup.outputs.pr-info).review.requested == true)
+      ((github.event.action == 'pull_request_review_requested' &&
+        fromJSON(needs.setup.outputs.pr-info).review.requested == true) ||
+       (github.event.action == 'pull_request_ready_for_review') &&
+        fromJSON(needs.setup.outputs.pr-info).pull_request.is_draft == false))
     runs-on: ubuntu-latest
     steps:
       # set 'ready for review' status label
@@ -157,7 +157,7 @@ jobs:
     needs: setup
     if: |
       fromJSON(needs.setup.outputs.automation-config).auto_status != null &&
-      github.event.name == 'pull_request_review_submitted'
+      github.event.action == 'pull_request_review_submitted'
     runs-on: ubuntu-latest
     steps:
       # remove all status labels if request is approved
@@ -192,7 +192,7 @@ jobs:
     needs: setup
     if: |
       fromJSON(needs.setup.outputs.automation-config).auto_status != null &&
-      github.event.name == 'pull_request_closed'
+      github.event.action == 'pull_request_closed'
     runs-on: ubuntu-latest
     steps:
       # remove all status labels

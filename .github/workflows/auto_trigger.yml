@@ -22,9 +22,8 @@ jobs:
     needs: setup
     if: |
       fromJSON(needs.setup.outputs.automation-config).auto_trigger != null &&
-      github.event.client_payload.branch ==
+      github.event.client_payload.ref ==
         fromJSON(needs.setup.outputs.automation-config).auto_trigger.branch
-
     runs-on: ubuntu-latest
     steps:
       # trigger builds on dependant repos

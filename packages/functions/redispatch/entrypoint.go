@@ -102,16 +102,10 @@ func Main(args map[string]any) map[string]any {
 		return makeErr(http.StatusBadRequest, "bad request: can't parse http.body: %s", err)
 	}
 
-	ghAction, ok := payload["action"].(string)
-	if !ok {
-		return makeErr(http.StatusBadRequest, "bad request: missing body.action")
-	}
-
 	repo, ok := payload["repository"].(map[string]any)
 	if !ok {
 		return makeErr(http.StatusBadRequest, "bad request: missing body.repository")
 	}
-
 	repoName, ok := repo["full_name"].(string)
 	if !ok {
 		return makeErr(http.StatusBadRequest, "bad request: missing body.repository.full_name")
@@ -122,23 +116,29 @@ func Main(args map[string]any) map[string]any {
 		return makeErr(http.StatusBadRequest, "bad request: unexpected repository")
 	}
 
-	// pull request or issue issueNumber (for pull_request_xxx and issue_xxx events)
-	var issueNumber float64
 	// branch or tag name (for push_xxx events)
 	var refType, refName string
+	// action type
+	var issueAction string
+	// pull request or issue issueNumber (for pull_request_xxx and issue_xxx events)
+	var issueNumber float64
 
 	switch {
 	case ghEvent == "push":
-		ref, _ := payload["ref"].(string)
-		if strings.HasPrefix(ref, "refs/heads/") {
+		fullRef, _ := payload["ref"].(string)
+		if strings.HasPrefix(fullRef, "refs/heads/") {
 			refType = "branch"
-			refName = strings.TrimPrefix(ref, "refs/heads/")
-		} else if strings.HasPrefix(ref, "refs/tags/") {
+			refName = strings.TrimPrefix(fullRef, "refs/heads/")
+		} else if strings.HasPrefix(fullRef, "refs/tags/") {
 			refType = "tag"
-			refName = strings.TrimPrefix(ref, "refs/tags/")
+			refName = strings.TrimPrefix(fullRef, "refs/tags/")
 		}
 
 	case strings.HasPrefix(ghEvent, "pull_request"):
+		issueAction, ok = payload["action"].(string)
+		if !ok {
+			return makeErr(http.StatusBadRequest, "bad request: missing body.action")
+		}
 		pullreq, ok := payload["pull_request"].(map[string]any)
 		if !ok {
 			return makeErr(http.StatusBadRequest, "bad request: missing body.pull_request")
@@ -152,6 +152,10 @@ func Main(args map[string]any) map[string]any {
 		}
 
 	default:
+		issueAction, ok = payload["action"].(string)
+		if !ok {
+			return makeErr(http.StatusBadRequest, "bad request: missing body.action")
+		}
 		issue, ok := payload["issue"].(map[string]any)
 		if !ok {
 			return makeErr(http.StatusBadRequest, "bad request: missing body.issue")
@@ -175,28 +179,28 @@ func Main(args map[string]any) map[string]any {
 			dispEvent = "push_" + refType
 		}
 	case "pull_request":
-		switch ghAction {
+		switch issueAction {
 		case "opened", "reopened", "closed", "synchronize",
 			"ready_for_review", "converted_to_draft",
 			"review_requested", "review_request_removed":
-			dispEvent = "pull_request_" + ghAction
+			dispEvent = "pull_request_" + issueAction
 		}
 	case "pull_request_review":
-		switch ghAction {
+		switch issueAction {
 		case "submitted", "edited", "dismissed":
-			dispEvent = "pull_request_review_" + ghAction
+			dispEvent = "pull_request_review_" + issueAction
 		}
 	case "issues":
-		switch ghAction {
+		switch issueAction {
 		case "opened", "reopened", "closed",
 			"labeled", "unlabeled":
-			dispEvent = "issue_" + ghAction
+			dispEvent = "issue_" + issueAction
 		}
 	}
 
 	if dispEvent == "" {
 		return makeErr(http.StatusAccepted,
-			"ignoring request: unsupported event %s/%s", ghEvent, ghAction)
+			"ignoring request: unsupported event %s/%s", ghEvent, issueAction)
 	}
 
 	// build repository_dispatch request
@@ -205,11 +209,11 @@ func Main(args map[string]any) map[string]any {
 	dispReqPayload := map[string]any{
 		"repo": repoName,
 	}
-	if issueNumber > 0 {
-		dispReqPayload["number"] = issueNumber
-	}
 	if refName != "" {
 		dispReqPayload["ref"] = refName
+	}
+	if issueNumber > 0 {
+		dispReqPayload["number"] = issueNumber
 	}
 
 	dispReqBody := map[string]any{
@@ -241,9 +245,8 @@ func Main(args map[string]any) map[string]any {
 	return map[string]any{
 		"statusCode": statusCode,
 		"body": map[string]any{
-			"event":  ghEvent,
-			"action": ghAction,
-			"repo":   repoName,
+			"event": ghEvent,
+			"repo":  repoName,
 			"dispatch": map[string]any{
 				"request_url":     dispReqURL,
 				"request_payload": dispReqPayload,
