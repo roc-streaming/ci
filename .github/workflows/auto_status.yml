@@ -113,7 +113,7 @@ jobs:
       fromJSON(needs.setup.outputs.automation-config).auto_status != null &&
       ((github.event.action == 'pull_request_review_request_removed' &&
         fromJSON(needs.setup.outputs.pr-info).review.requested == false) ||
-       (github.event.action == 'pull_request_converted_to_draft') &&
+       (github.event.action == 'pull_request_converted_to_draft' &&
         fromJSON(needs.setup.outputs.pr-info).pull_request.is_draft == true))
     runs-on: ubuntu-latest
     steps:
@@ -136,7 +136,7 @@ jobs:
       fromJSON(needs.setup.outputs.automation-config).auto_status != null &&
       ((github.event.action == 'pull_request_review_requested' &&
         fromJSON(needs.setup.outputs.pr-info).review.requested == true) ||
-       (github.event.action == 'pull_request_ready_for_review') &&
+       (github.event.action == 'pull_request_ready_for_review' &&
         fromJSON(needs.setup.outputs.pr-info).pull_request.is_draft == false))
     runs-on: ubuntu-latest
     steps:
