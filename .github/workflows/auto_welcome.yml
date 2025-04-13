@@ -6,6 +6,9 @@ on:
       - pull_request_opened
       - pull_request_reopened
 
+concurrency:
+  group: ${{ github.event.client_payload.repo }}
+
 jobs:
   setup:
     outputs:

@@ -5,6 +5,9 @@ on:
     types:
       - push_branch
 
+concurrency:
+  group: ${{ github.event.client_payload.repo }}
+
 jobs:
   setup:
     outputs:

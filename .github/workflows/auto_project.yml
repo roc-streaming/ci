@@ -7,6 +7,9 @@ on:
       - issue_reopened
       - issue_labeled
 
+concurrency:
+  group: ${{ github.event.client_payload.repo }}
+
 jobs:
   setup:
     outputs:

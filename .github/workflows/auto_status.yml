@@ -17,6 +17,9 @@ on:
       # on-close
       - pull_request_closed
 
+concurrency:
+  group: ${{ github.event.client_payload.repo }}
+
 jobs:
   setup:
     outputs:
@@ -123,10 +126,10 @@ jobs:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
           remove-labels: |
-            status: work in progress
+            status: ready for review
             status: needs revision
           add-labels: |
-            status: ready for review
+            status: work in progress
           github-token: ${{ secrets.BOT_TOKEN }}
 
   # pull request undrafted or review requested
