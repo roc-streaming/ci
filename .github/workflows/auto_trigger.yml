@@ -6,7 +6,7 @@ on:
       - push_branch
 
 concurrency:
-  group: ${{ github.event.client_payload.repo }}
+  group: ${{ github.event.client_payload.repo }}/${{ github.workflow }}
 
 jobs:
   setup:
