@@ -17,7 +17,7 @@ runs:
   steps:
     - shell: bash
       run: |
-        token="$(echo "${{ inputs.token }}" | tr -d '[:space:]')"
+        token="$(echo "${{ inputs.github-token }}" | tr -d '[:space:]')"
         event="$(echo "${{ inputs.event }}" | tr -d '[:space:]')"
         repos="$(echo "${{ inputs.repo }}" | tr -s '[:space:]' '\n')"
 
