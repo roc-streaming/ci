@@ -17,14 +17,17 @@ runs:
   steps:
     - shell: bash
       run: |
-        echo "${{ inputs.repo }}" | tr -s '[:space:]' '\n' \
-        | while read repo; do
-          echo "sending ${{ inputs.event }} event to ${repo} ..."
+        token="$(echo "${{ inputs.token }}" | tr -d '[:space:]')"
+        event="$(echo "${{ inputs.event }}" | tr -d '[:space:]')"
+        repos="$(echo "${{ inputs.repo }}" | tr -s '[:space:]' '\n')"
+
+        echo "${repos}" \
+          | while read repo; do
+          echo "sending ${event} event to ${repo} ..."
           curl -Ls --fail-with-body -X POST \
-            -H 'Authorization: Bearer ${{ inputs.github-token }}' \
-            -H 'Accept: application/vnd.github.v3+json' \
-            -H 'Content-Type: application/json' \
-            'https://api.github.com/repos/${repo}/dispatches' \
-            --data \
-            '{"event_type": "${{ inputs.event }}", "client_payload": {}}'
+            -H "Authorization: Bearer ${token}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            --data "{\"event_type\": \"${event}\", \"client_payload\": {}}" \
+            "https://api.github.com/repos/${repo}/dispatches"
         done
