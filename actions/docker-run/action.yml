@@ -1,0 +1,30 @@
+name: 'Docker run'
+description: 'Run command in docker'
+
+inputs:
+  image:
+    description: 'Docker image name'
+    required: true
+  run:
+    description: 'Command to run'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      run: |
+        image="$(echo "${{ inputs.image }}" | tr -d '[:space:]')"
+        command="${{ inputs.run }}"
+        command="${command//$'\n'/;}"
+
+        docker run --rm -t \
+          --cap-add SYS_PTRACE \
+          -u "${UID}" \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v ${{ github.workspace }}:/work \
+          -w /work \
+          -e CI="${CI:-}" \
+          --entrypoint=/bin/bash
+          "${image}" \
+          -c "${command}"
