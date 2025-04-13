@@ -26,14 +26,16 @@ jobs:
     if: |
       fromJSON(needs.setup.outputs.automation-config).auto_trigger != null &&
       github.event.client_payload.ref ==
-        fromJSON(needs.setup.outputs.automation-config).auto_trigger.branch
+        fromJSON(needs.setup.outputs.automation-config).auto_trigger.branch &&
+      fromJSON(needs.setup.outputs.automation-config).auto_trigger.rebuild_repos != null &&
+      fromJSON(needs.setup.outputs.automation-config).auto_trigger.rebuild_repos != []
     runs-on: ubuntu-latest
     steps:
       # trigger builds on dependant repos
       - uses: roc-streaming/ci/actions/dispatch-event@main
         with:
           repo: |
-            ${{ join(fromJSON(needs.setup.outputs.automation-config).auto_trigger.repos, ' ') }}
+            ${{ join(fromJSON(needs.setup.outputs.automation-config).auto_trigger.rebuild_repos, ' ') }}
           event: |
             trigger_build
           github-token: ${{ secrets.BOT_TOKEN }}
