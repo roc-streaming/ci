@@ -13,10 +13,10 @@ runs:
   using: 'composite'
   steps:
     - shell: bash
+      env:
+        image: ${{ inputs.image }}
+        command: ${{ inputs.run }}
       run: |
-        image="$(echo "${{ inputs.image }}" | tr -d '[:space:]')"
-        command="${{ inputs.run }}"
-
         docker run --rm -t \
           --cap-add SYS_PTRACE \
           -u "${UID}:${GID}" \
