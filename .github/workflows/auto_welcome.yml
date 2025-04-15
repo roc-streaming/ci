@@ -35,8 +35,8 @@ jobs:
     if: |
       fromJSON(needs.setup.outputs.automation-config).auto_welcome != null
     env:
-      contrib_branch: fromJSON(needs.setup.outputs.automation-config).auto_welcome.contrib_branch
-      contrib_guide: fromJSON(needs.setup.outputs.automation-config).auto_welcome.contrib_guide
+      contrib_branch: ${{ fromJSON(needs.setup.outputs.automation-config).auto_welcome.contrib_branch }}
+      contrib_guide: ${{ fromJSON(needs.setup.outputs.automation-config).auto_welcome.contrib_guide }}
 
     runs-on: ubuntu-latest
     steps:
@@ -95,6 +95,7 @@ jobs:
 
       # warn on wrong target branch
       - if: |
+          fromJSON(needs.setup.outputs.pr-info).author.is_contrib == true &&
           fromJSON(needs.setup.outputs.pr-info).pull_request.target_branch != env.contrib_branch
         uses: roc-streaming/ci/actions/post-comment@main
         with:
