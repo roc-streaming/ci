@@ -13,7 +13,7 @@ async function main() {
   const projectNumber = parseInt(core.getInput("project", { required: true }));
   const labelToStatus = JSON.parse(core.getInput("label-to-status") || "{}");
 
-  const client = github.getOctokit(token);
+  const client = github.getOctokit(githubToken);
 
   const findProjectQuery = `
     query($owner: String!, $number: Int!) {
