@@ -449,7 +449,7 @@ def query_pr_author(org, repo, pr_number, no_git=False):
             ['gh', 'pr', 'list',
              '--repo', f'{org}/{repo}',
              '--author', pr_info['pr_author'],
-             '--state', 'merged',
+             '--state', 'all',
              '--json', 'number',
              '--jq', 'length',
              ],
