@@ -185,6 +185,7 @@ jobs:
           number: ${{ github.event.client_payload.number }}
           remove-labels: |
             status: ready for review
+            status: review in progress
             status: work in progress
           add-labels: |
             status: needs revision
