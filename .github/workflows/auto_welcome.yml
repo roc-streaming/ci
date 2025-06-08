@@ -49,23 +49,23 @@ jobs:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
           text: |
-            :robot: Welcome! Thanks for your interest in contributing to the project!
+            :robot: Welcome! Thank you for contributing to the project!
 
-            Here is a short check-list to help you get started:
+            Quick checklist for contributors:
 
              **Creating pull request**
 
-             - Target PR to `${{ env.contrib_branch }}` branch.
-             - Include link to related issue in PR description.
-             - Ensure all CI checks pass.
+             - target PR to `${{ env.contrib_branch }}` branch
+             - include link to related issue
+             - ensure all CI checks pass
 
              **Code review**
 
-             - Mark PR as draft until it's ready. When ready, undraft and request review.
-             - Don't resolve discussions by yourself, instead leave a comment or thumbs up.
-             - Re-request review after addressing all discussions.
+             - until ready, mark PR as draft, when ready, undraft and request review
+             - don't resolve discussions by yourself, instead comment or thumb-up
+             - re-request review after addressing feedback
 
-             Refer to [contribution guidelines](${{ env.contrib_guide }}) for futher details.
+             Refer to [contribution guidelines](${{ env.contrib_guide }}) for more details.
           github-token: ${{ secrets.BOT_TOKEN }}
 
       # assign 'contribution' label
