@@ -46,7 +46,7 @@ jobs:
           number: |
             ${{ join(fromJSON(steps.pr-statuses.outputs.without-conflicts), ' ') }}
           remove-labels: |
-            status: needs rebase
+            S-needs-rebase
           github-token: ${{ secrets.BOT_TOKEN }}
 
       # add 'needs rebase' label to pull requests with conflicts, if missing
@@ -59,7 +59,7 @@ jobs:
           number: |
             ${{ join(fromJSON(steps.pr-statuses.outputs.with-conflicts), ' ') }}
           add-labels: |
-            status: needs rebase
+            S-needs-rebase
           github-token: ${{ secrets.BOT_TOKEN }}
 
       # post comment on pull requests where 'needs rebase' label was missing and we added it

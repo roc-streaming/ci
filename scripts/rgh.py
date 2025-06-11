@@ -603,7 +603,7 @@ def show_pr(org, repo, pr_number, show_json):
 
     for k, v in js['pull_request'].items():
         if k == 'labels':
-            colors = [Fore.YELLOW if label.startswith('status:') else None \
+            colors = [Fore.YELLOW if label.startswith('S-') else None \
                       for label in v]
             print_arr('labels', v, colors, depth=1)
             continue
@@ -636,7 +636,7 @@ def show_pr(org, repo, pr_number, show_json):
     if js['linked_issue']:
         for k, v in js['linked_issue'].items():
             if k == 'labels':
-                colors = [Fore.YELLOW if label.startswith('status:') else None \
+                colors = [Fore.YELLOW if label.startswith('S-') else None \
                           for label in v]
                 print_arr('labels', v, colors, depth=1)
                 continue
@@ -710,7 +710,7 @@ def show_issue(org, repo, issue_number, show_json):
 
     for k, v in js['issue'].items():
         if k == 'labels':
-            colors = [Fore.YELLOW if label.startswith('status:') else None \
+            colors = [Fore.YELLOW if label.startswith('S-') else None \
                       for label in v]
             print_arr('labels', v, colors, depth=1)
             continue
@@ -1015,21 +1015,103 @@ def merge_pr(org, repo, pr_number):
         ],
         retry_fn=retry_fn)
 
-# rebase current branch on base branch
-# like normal rebase, but preserves original committer name, email, and date
-def stb_rebase(base_branch):
-    cmd='%s%nexec GIT_COMMITTER_DATE="%cD" GIT_COMMITTER_NAME="%cn" GIT_COMMITTER_EMAIL="%ce"'
+COMMON_LABELS = [
+    # category
 
-    run_cmd([
-        'git',
-        '-c' f'rebase.instructionFormat="{cmd} git commit --amend --no-edit"',
-        'rebase', '-i',
-        base_branch,
-    ],
-    env={
-        'GIT_EDITOR': ':',
-        'GIT_SEQUENCE_EDITOR': ':',
-    })
+    ('C-algorithms',             '#ff87ad', 'category: Algorithms and data structures'),
+    ('C-android',                '#f7b7e0', 'category: Android development'),
+    ('C-api',                    '#006b75', 'category: Public API'),
+    ('C-benchmarks',             '#6dc9d1', 'category: Performance benchmarks'),
+    ('C-build-system',           '#bfe5bf', 'category: Build scripts'),
+    ('C-codecs',                 '#454ed1', 'category: Audio and FEC codecs'),
+    ('C-command-line',           '#ebbebf', 'category: Command-line tools'),
+    ('C-continuous-integration', '#daf2da', 'category: Continuous integration'),
+    ('C-documentation',          '#1d4299', 'category: Documentation improvements'),
+    ('C-dsp',                    '#ef83f7', 'category: Digital sound processing'),
+    ('C-networking',             '#3fffb8', 'category: Network I/O'),
+    ('C-packaging',              '#1d76db', 'category: Packaging scripts'),
+    ('C-performance',            '#fef2c0', 'category: Profiling and optimizations'),
+    ('C-portability',            '#fad8c7', 'category: Cross-platform support'),
+    ('C-refactoring',            '#d4c5f9', 'category: Refactoring'),
+    ('C-grpc',                   '#006b75', 'category: gRPC support'),
+    ('C-rt-tests',               '#e6f0ff', 'category: Real-time tests'),
+    ('C-security',               '#15b58d', 'category: Security or encryption'),
+    ('C-sound-io',               '#fcd9f0', 'category: Audio I/O'),
+    ('C-system',                 '#ba1856', 'category: Low-level systems programming'),
+    ('C-tests',                  '#9fcafc', 'category: Writing or improving tests'),
+    ('C-tooling',                '#846a8a', 'category: Improving developer tools'),
+
+    # status
+
+    ('S-duplicate',          '#ef9928', 'status: Already addressed by another issue or PR'),
+    ('S-work-in-progress',   '#bfdadc', 'status: PR is still in progress and changing'),
+    ('S-ready-for-review',   '#2dc439', 'status: PR can be reviewed'),
+    ('S-review-in-progress', '#e9ef99', 'status: PR is being reviewed'),
+    ('S-dismissed',          '#aa4229', 'status: Decided not to implement'),
+    ('S-needs-revision',     '#f4e68b', 'status: Author should revise PR and address feedback'),
+    ('S-cant-reproduce',     '#ef9928', 'status: Unable to reproduce problem'),
+    ('S-not-a-bug',          '#ef9928', 'status: Working as intended'),
+    ('S-postponed',          '#aa4229', 'status: Postponed for an indefinite period'),
+    ('S-merged-manually',    '#d4c5f9', 'status: Commits from PR were cherry-picked manually'),
+    ('S-needs-rebase',       '#ffcfcf', 'status: PR has conflicts and should be rebased'),
+    ('S-moved',              '#ef9928', 'status: Transitioned to another issue or PR'),
+    ('S-waiting-reply',      '#F9D0C4', 'status: Waiting for response from issue or PR author'),
+    ('S-stalled',            '#F9D0C4', 'status: PR or issue is abandoned'),
+    ('S-in-qa',              '#cc317c', 'status: QA in progress'),
+
+    # standard
+
+    ('contrib',                '#e0ffb2', 'PR not by a maintainer'),
+    ('hacktoberfest-accepted', '#edfffe', 'PR approved for Hacktoberfest even if not ready'),
+    ('help wanted',            '#9fe84c', 'Looking for contributors'),
+    ('invalid',                '#cfcfcf', 'Malformed or low-quality PR or spam'),
+
+]
+
+TOOLKIT_LABELS = [
+    ('easy hacks',      '#7fefed', 'Solution requires minimal project context'),
+    ('feature request', '#0e8a16', 'Feature requested by user'),
+    ('most wanted',     '#ffea00', 'Needed most among other help-wanted issues'),
+    ('user report',     '#e0ffb2', 'A bug-report or a feature-request not by a maintainer'),
+]
+
+OTHER_LABELS = [
+    ('good first issue', '#a5f2ea', 'Task good for newcomers'),
+]
+
+# create / update / delete repo labels
+def sync_labels(org, repo):
+    try:
+        response = json.loads(subprocess.run([
+            'gh', 'label', 'list', '--json', 'name',
+            '--limit', '100',
+            '--repo', f'{org}/{repo}',
+            ],
+            capture_output=True, text=True, check=True).stdout)
+    except subprocess.CalledProcessError as e:
+        error(f'failed to retrieve labels: {e.stderr.strip()}')
+
+    existing_labels = set([label['name'] for label in response])
+
+    target_labels = COMMON_LABELS[:]
+    if repo == 'roc-toolkit':
+        target_labels += TOOLKIT_LABELS
+    else:
+        target_labels += OTHER_LABELS
+
+    for label, color, text in target_labels:
+        if label in existing_labels:
+            mode = 'edit'
+        else:
+            mode = 'create'
+
+        run_cmd([
+            'gh', 'label', mode,
+            '--repo', f'{org}/{repo}',
+            label,
+            '--description', text,
+            '--color', color,
+            ])
 
 parser = argparse.ArgumentParser(prog='rgh.py')
 
@@ -1037,11 +1119,6 @@ common_parser = argparse.ArgumentParser(add_help=False)
 common_parser.add_argument('-R', '--repo', type=str, help='github repo')
 
 subparsers = parser.add_subparsers(dest='command')
-
-stb_rebase_parser = subparsers.add_parser(
-    'stb_rebase', parents=[common_parser],
-    help="rebase local branch preserving author and date")
-stb_rebase_parser.add_argument('base_branch', action='store_true')
 
 show_issue_parser = subparsers.add_parser(
     'show_issue', parents=[common_parser],
@@ -1086,6 +1163,12 @@ merge_pr_parser.add_argument('--no-push', action='store_true', dest='no_push',
 merge_pr_parser.add_argument('-n', '--dry-run', action='store_true', dest='dry_run',
                              help="don't actually run commands, just print them")
 
+sync_labels_parser = subparsers.add_parser(
+    'sync_labels', parents=[common_parser],
+    help="create or update repo labels")
+sync_labels_parser.add_argument('-n', '--dry-run', action='store_true', dest='dry_run',
+                                 help="don't actually run commands, just print them")
+
 args = parser.parse_args()
 
 if hasattr(args, 'dry_run'):
@@ -1093,10 +1176,6 @@ if hasattr(args, 'dry_run'):
 
 colorama.init()
 check_tools()
-
-if args.command == 'stb_rebase':
-    stb_rebase(args.base_branch)
-    exit(0)
 
 org, repo = parse_repo(args.repo)
 
@@ -1149,4 +1228,8 @@ if args.command == 'merge_pr':
         if merged:
             # delete temp branch (but only on success)
             delete_ref(pr_ref)
+    exit(0)
+
+if args.command == 'sync_labels':
+    sync_labels(org, repo)
     exit(0)

@@ -69,7 +69,7 @@ jobs:
       # if build failed, warn that we're going to set 'work in progress' status
       - if: |
           fromJSON(steps.new-pr-info.outputs.info).actions.build == 'failure' &&
-          !contains(toJSON(fromJSON(steps.new-pr-info.outputs.info).labels), 'status:')
+          !contains(toJSON(fromJSON(steps.new-pr-info.outputs.info).labels), 'S-')
         uses: roc-streaming/ci/actions/post-comment@main
         with:
           repo: ${{ github.event.client_payload.repo }}
@@ -85,13 +85,13 @@ jobs:
       - if: |
           fromJSON(steps.new-pr-info.outputs.info).pull_request.is_draft == true ||
           (fromJSON(steps.new-pr-info.outputs.info).actions.build == 'failure' &&
-           !contains(toJSON(fromJSON(steps.new-pr-info.outputs.info).labels), 'status:'))
+           !contains(toJSON(fromJSON(steps.new-pr-info.outputs.info).labels), 'S-'))
         uses: roc-streaming/ci/actions/update-labels@main
         with:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
           add-labels: |
-            status: work in progress
+            S-work-in-progress
           github-token: ${{ secrets.BOT_TOKEN }}
 
       # if review was requested, or build succeeded and pull request is not draft,
@@ -100,13 +100,13 @@ jobs:
           fromJSON(steps.new-pr-info.outputs.info).review.requested == true ||
           (fromJSON(steps.new-pr-info.outputs.info).pull_request.is_draft == false &&
            fromJSON(steps.new-pr-info.outputs.info).actions.build == 'success' &&
-           !contains(toJSON(fromJSON(steps.new-pr-info.outputs.info).labels), 'status:'))
+           !contains(toJSON(fromJSON(steps.new-pr-info.outputs.info).labels), 'S-'))
         uses: roc-streaming/ci/actions/update-labels@main
         with:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
           add-labels: |
-            status: ready for review
+            S-ready-for-review
           github-token: ${{ secrets.BOT_TOKEN }}
 
   # pull request drafted or review request removed
@@ -126,10 +126,10 @@ jobs:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
           remove-labels: |
-            status: ready for review
-            status: needs revision
+            S-ready-for-review
+            S-needs-revision
           add-labels: |
-            status: work in progress
+            S-work-in-progress
           github-token: ${{ secrets.BOT_TOKEN }}
 
   # pull request undrafted or review requested
@@ -149,10 +149,10 @@ jobs:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
           remove-labels: |
-            status: work in progress
-            status: needs revision
+            S-work-in-progress
+            S-needs-revision
           add-labels: |
-            status: ready for review
+            S-ready-for-review
           github-token: ${{ secrets.BOT_TOKEN }}
 
   # pull request reviewed
@@ -171,9 +171,9 @@ jobs:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
           remove-labels: |
-            status: ready for review
-            status: review in progress
-            status: needs revision
+            S-ready-for-review
+            S-review-in-progress
+            S-needs-revision
           github-token: ${{ secrets.BOT_TOKEN }}
 
       # set 'needs revision' status label if changes requested
@@ -184,11 +184,11 @@ jobs:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
           remove-labels: |
-            status: ready for review
-            status: review in progress
-            status: work in progress
+            S-ready-for-review
+            S-review-in-progress
+            S-work-in-progress
           add-labels: |
-            status: needs revision
+            S-needs-revision
           github-token: ${{ secrets.BOT_TOKEN }}
 
   # pull request closed
@@ -205,9 +205,9 @@ jobs:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
           remove-labels: |
-            status: work in progress
-            status: ready for review
-            status: review in progress
-            status: needs revision
-            status: needs rebase
+            S-work-in-progress
+            S-ready-for-review
+            S-review-in-progress
+            S-needs-revision
+            S-needs-rebase
           github-token: ${{ secrets.BOT_TOKEN }}

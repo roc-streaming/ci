@@ -68,7 +68,7 @@ jobs:
              Refer to [contribution guidelines](${{ env.contrib_guide }}) for more details.
           github-token: ${{ secrets.BOT_TOKEN }}
 
-      # assign 'contribution' label
+      # assign 'contrib' label
       - if: |
           fromJSON(needs.setup.outputs.pr-info).author.is_contrib == true
         uses: roc-streaming/ci/actions/update-labels@main
@@ -76,7 +76,7 @@ jobs:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
           add-labels: |
-            contribution
+            contrib
           github-token: ${{ secrets.BOT_TOKEN }}
 
       # warn on missing linked issue

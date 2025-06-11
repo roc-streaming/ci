@@ -22,10 +22,14 @@ roc-toolkit:
       - roc-streaming/rocd
       - roc-streaming/roc-streaming.github.io
 
+roc-vad:
+  auto_status:
+    wait_workflow: "build"
+
 rocd:
   auto_welcome:
     contrib_branch: "main"
-    contrib_guide: "https://roc-streaming.org/rocd/hacking/dev_dependencies.html"
+    contrib_guide: "https://roc-streaming.org/rocd/docs/development/environment.html"
 
   auto_status:
     wait_workflow: "build"
