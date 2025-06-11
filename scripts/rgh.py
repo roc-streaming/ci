@@ -1028,15 +1028,17 @@ COMMON_LABELS = [
     ('C-continuous-integration', '#daf2da', 'category: Continuous integration'),
     ('C-documentation',          '#1d4299', 'category: Documentation improvements'),
     ('C-dsp',                    '#ef83f7', 'category: Digital sound processing'),
-    ('C-networking',             '#3fffb8', 'category: Network I/O'),
+    ('C-grpc',                   '#006b75', 'category: gRPC support'),
+    ('C-networking',             '#3fffb8', 'category: Network and streaming'),
     ('C-packaging',              '#1d76db', 'category: Packaging scripts'),
     ('C-performance',            '#fef2c0', 'category: Profiling and optimizations'),
     ('C-portability',            '#fad8c7', 'category: Cross-platform support'),
     ('C-refactoring',            '#d4c5f9', 'category: Refactoring'),
-    ('C-grpc',                   '#006b75', 'category: gRPC support'),
+    ('C-rest-api',               '#006b75', 'category: REST API'),
     ('C-rt-tests',               '#e6f0ff', 'category: Real-time tests'),
     ('C-security',               '#15b58d', 'category: Security or encryption'),
     ('C-sound-io',               '#fcd9f0', 'category: Audio I/O'),
+    ('C-storage',                '#acd6e3', 'category: Persistent storage'),
     ('C-system',                 '#ba1856', 'category: Low-level systems programming'),
     ('C-tests',                  '#9fcafc', 'category: Writing or improving tests'),
     ('C-tooling',                '#846a8a', 'category: Improving developer tools'),
@@ -1087,7 +1089,7 @@ def sync_labels(org, repo):
             '--limit', '100',
             '--repo', f'{org}/{repo}',
             ],
-            capture_output=True, text=True, check=True).stdout)
+            capture_output=True, text=True, check=True).stdout or '[]')
     except subprocess.CalledProcessError as e:
         error(f'failed to retrieve labels: {e.stderr.strip()}')
 
