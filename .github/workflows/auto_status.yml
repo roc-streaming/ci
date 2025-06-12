@@ -232,9 +232,9 @@ jobs:
           text: |
             :robot: **Review blocked**
 
-            This PR was flagged due to one or more quality issues:
+            This PR has been flagged due to one or more quality issues:
 
-            * fails to build
+            * fails to compile
             * fails to follow project code style
             * contains hallucinated or invalid code
 

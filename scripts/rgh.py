@@ -1048,7 +1048,7 @@ COMMON_LABELS = [
 
     # status
 
-    ('S-borked',             '#ca523c', 'status: Review blocked due to quality issues'),
+    ('S-borked',             '#b60205', 'status: Review blocked due to quality issues'),
     ('S-cant-reproduce',     '#ef9928', 'status: Unable to reproduce problem'),
     ('S-dismissed',          '#9e5847', 'status: Decided not to implement'),
     ('S-duplicate',          '#ef9928', 'status: Already addressed by another issue or PR'),
