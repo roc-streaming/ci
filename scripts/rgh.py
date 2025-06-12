@@ -389,7 +389,7 @@ def query_pr_review(org, repo, pr_number):
     return review_info
 
 @functools.cache
-def query_pr_actions(org, repo, pr_number, no_git=False):
+def query_pr_actions(org, repo, pr_number, no_git=False, silent_error=False):
     pr_info = query_pr_info(org, repo, pr_number, no_git)
 
     try:
@@ -401,7 +401,10 @@ def query_pr_actions(org, repo, pr_number, no_git=False):
             ],
             capture_output=True, text=True, check=True).stdout)
     except subprocess.CalledProcessError as e:
-        error(f'failed to retrieve workflow runs: {e.stderr.strip()}')
+        if silent_error:
+            response = []
+        else:
+            error(f'failed to retrieve workflow runs: {e.stderr.strip()}')
 
     results = {}
     for check in response:
@@ -483,7 +486,7 @@ def find_pr_fork_point(org, repo, pr_number):
 # dump pr info in json format
 def build_pr_json(org, repo, pr_number):
     pr_info = query_pr_info(org, repo, pr_number, no_git=True)
-    pr_actions = query_pr_actions(org, repo, pr_number, no_git=True)
+    pr_actions = query_pr_actions(org, repo, pr_number, no_git=True, silent_error=True)
     pr_commits = query_pr_commits(org, repo, pr_number, no_git=True)
     pr_author = query_pr_author(org, repo, pr_number, no_git=True)
 
