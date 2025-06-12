@@ -1048,21 +1048,22 @@ COMMON_LABELS = [
 
     # status
 
+    ('S-borked',             '#ca523c', 'status: Review blocked due to quality issues'),
+    ('S-cant-reproduce',     '#ef9928', 'status: Unable to reproduce problem'),
+    ('S-dismissed',          '#9e5847', 'status: Decided not to implement'),
     ('S-duplicate',          '#ef9928', 'status: Already addressed by another issue or PR'),
-    ('S-work-in-progress',   '#bfdadc', 'status: PR is still in progress and changing'),
+    ('S-in-qa',              '#cc317c', 'status: QA in progress'),
+    ('S-merged-manually',    '#d4c5f9', 'status: Commits from PR were cherry-picked manually'),
+    ('S-moved',              '#ef9928', 'status: Transitioned to another issue or PR'),
+    ('S-needs-rebase',       '#ffcfcf', 'status: PR has conflicts and should be rebased'),
+    ('S-needs-revision',     '#f4e68b', 'status: Author should revise PR and address feedback'),
+    ('S-not-a-bug',          '#ef9928', 'status: Working as intended'),
+    ('S-postponed',          '#9e5847', 'status: Postponed for an indefinite period'),
     ('S-ready-for-review',   '#2dc439', 'status: PR can be reviewed'),
     ('S-review-in-progress', '#e9ef99', 'status: PR is being reviewed'),
-    ('S-dismissed',          '#aa4229', 'status: Decided not to implement'),
-    ('S-needs-revision',     '#f4e68b', 'status: Author should revise PR and address feedback'),
-    ('S-cant-reproduce',     '#ef9928', 'status: Unable to reproduce problem'),
-    ('S-not-a-bug',          '#ef9928', 'status: Working as intended'),
-    ('S-postponed',          '#aa4229', 'status: Postponed for an indefinite period'),
-    ('S-merged-manually',    '#d4c5f9', 'status: Commits from PR were cherry-picked manually'),
-    ('S-needs-rebase',       '#ffcfcf', 'status: PR has conflicts and should be rebased'),
-    ('S-moved',              '#ef9928', 'status: Transitioned to another issue or PR'),
-    ('S-waiting-reply',      '#F9D0C4', 'status: Waiting for response from issue or PR author'),
     ('S-stalled',            '#F9D0C4', 'status: PR or issue is abandoned'),
-    ('S-in-qa',              '#cc317c', 'status: QA in progress'),
+    ('S-waiting-reply',      '#F9D0C4', 'status: Waiting for response from issue or PR author'),
+    ('S-work-in-progress',   '#bfdadc', 'status: PR is still in progress and changing'),
 
     # standard
 
@@ -1084,19 +1085,19 @@ OTHER_LABELS = [
     ('good first issue', '#a5f2ea', 'Task good for newcomers'),
 ]
 
-# create / update / delete repo labels
+# create / update repo labels
 def sync_labels(org, repo):
     try:
         response = json.loads(subprocess.run([
-            'gh', 'label', 'list', '--json', 'name',
-            '--limit', '100',
+            'gh', 'label', 'list', '--json', 'name,color,description',
+            '--limit', '999',
             '--repo', f'{org}/{repo}',
             ],
             capture_output=True, text=True, check=True).stdout or '[]')
     except subprocess.CalledProcessError as e:
         error(f'failed to retrieve labels: {e.stderr.strip()}')
 
-    existing_labels = set([label['name'] for label in response])
+    existing_labels = {label['name']: label for label in response}
 
     target_labels = COMMON_LABELS[:]
     if repo == 'roc-toolkit':
@@ -1104,8 +1105,11 @@ def sync_labels(org, repo):
     else:
         target_labels += OTHER_LABELS
 
-    for label, color, text in target_labels:
+    for label, color, description in target_labels:
         if label in existing_labels:
+            if color == '#' + existing_labels[label]['color'] and \
+               description == existing_labels[label]['description']:
+                continue
             mode = 'edit'
         else:
             mode = 'create'
@@ -1114,7 +1118,7 @@ def sync_labels(org, repo):
             'gh', 'label', mode,
             '--repo', f'{org}/{repo}',
             label,
-            '--description', text,
+            '--description', description,
             '--color', color,
             ])
 

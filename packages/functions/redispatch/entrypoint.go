@@ -169,6 +169,15 @@ func Main(args map[string]any) map[string]any {
 		}
 	}
 
+	issueLabel := ""
+	if issueAction == "labeled" || issueAction == "unlabeled" {
+		if label, ok := payload["label"].(map[string]any); ok {
+			if name, ok := label["name"].(string); ok {
+				issueLabel = name
+			}
+		}
+	}
+
 	// filter out unused events to avoid spamming
 	dispEvent := ""
 
@@ -181,6 +190,7 @@ func Main(args map[string]any) map[string]any {
 	case "pull_request":
 		switch issueAction {
 		case "opened", "reopened", "closed", "synchronize",
+			"labeled", "unlabeled",
 			"ready_for_review", "converted_to_draft",
 			"review_requested", "review_request_removed":
 			dispEvent = "pull_request_" + issueAction
@@ -214,6 +224,9 @@ func Main(args map[string]any) map[string]any {
 	}
 	if issueNumber > 0 {
 		dispReqPayload["number"] = issueNumber
+	}
+	if issueLabel != "" {
+		dispReqPayload["label"] = issueLabel
 	}
 
 	dispReqBody := map[string]any{

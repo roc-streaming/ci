@@ -16,6 +16,8 @@ on:
       - pull_request_review_submitted
       # on-close
       - pull_request_closed
+      # on-label
+      - pull_request_labeled
 
 concurrency:
   group: ${{ github.event.client_payload.repo }}/${{ github.workflow }}
@@ -210,4 +212,31 @@ jobs:
             S-review-in-progress
             S-needs-revision
             S-needs-rebase
+          github-token: ${{ secrets.BOT_TOKEN }}
+
+  # pull request labeled
+  on-label:
+    needs: setup
+    if: |
+      fromJSON(needs.setup.outputs.automation-config).auto_status != null &&
+      github.event.action == 'pull_request_labeled'
+    runs-on: ubuntu-latest
+    steps:
+      # when labeled with 'S-borked', post a comment
+      - if: |
+          github.event.client_payload.label == 'S-borked'
+        uses: roc-streaming/ci/actions/post-comment@main
+        with:
+          repo: ${{ github.event.client_payload.repo }}
+          number: ${{ github.event.client_payload.number }}
+          text: ":robot: **Review blocked**
+            \n
+            This PR was flagged due to one or more quality issues:
+            \n
+            * fails to build
+            * fails to follow project code style
+            * contains hallucinated or invalid code
+            \n
+            Please validate and test your changes locally before submitting a PR.
+            "
           github-token: ${{ secrets.BOT_TOKEN }}
