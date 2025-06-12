@@ -229,14 +229,14 @@ jobs:
         with:
           repo: ${{ github.event.client_payload.repo }}
           number: ${{ github.event.client_payload.number }}
-          text: ":robot: **Review blocked**
-            \n
+          text: |
+            :robot: **Review blocked**
+
             This PR was flagged due to one or more quality issues:
-            \n
+
             * fails to build
             * fails to follow project code style
             * contains hallucinated or invalid code
-            \n
+
             Please validate and test your changes locally before submitting a PR.
-            "
           github-token: ${{ secrets.BOT_TOKEN }}
