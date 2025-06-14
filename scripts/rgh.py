@@ -1,5 +1,4 @@
 #! /usr/bin/env python3
-
 from collections import OrderedDict
 from colorama import Fore, Style
 import argparse
@@ -19,16 +18,33 @@ import tempfile
 import time
 
 DRY_RUN = False
+ASK = True
 TOKEN = None
 
 def error(message):
     print(f'{Fore.RED}{Style.BRIGHT}error:{Style.RESET_ALL} {message}', file=sys.stderr)
     sys.exit(1)
 
+def ask(message):
+    if not ASK:
+        return
+    while True:
+        answer = input(f'{Fore.YELLOW}{Style.BRIGHT}{message}{Style.RESET_ALL} (y/n) ')
+        if answer in ['n', 'no']:
+            print('Aborted by user.')
+            sys.exit(1)
+        if answer in ['y', 'yes']:
+            return
+        print("Please enter 'y' or 'n'")
+
 def print_cmd(cmd):
     pretty = ' '.join(['"'+c+'"' if ' ' in c else c for c in map(str, cmd)])
     print(f'{Fore.YELLOW}{pretty}{Style.RESET_ALL}')
 
+# runs `cmd` (must be a list)
+# prints command output to stdout
+# dies if command fails
+# if `retry_fn` is given, retries failed command while retry_fn(cmd_output) returns True
 def run_cmd(cmd, input=None, env=None, retry_fn=None):
     cmd = [str(c) for c in cmd]
 
@@ -68,7 +84,7 @@ def run_cmd(cmd, input=None, env=None, retry_fn=None):
             error('command failed')
         return
 
-# get org+repo from --repo arg
+# extract (org, repo) from --repo=org/repo
 def parse_repo(s):
     org, repo = None, None
 
@@ -199,8 +215,12 @@ def guess_issue(org, repo, text):
 
     return None
 
+# construct regexp for matching prefix or suffix of PR or commit title
+# with issue number
+# returned regexp must be suitable for both python and sed
+# see make_message() and reword_pr_commits()
 def make_prefix_suffix_regexp(org, repo, is_prefix):
-    kv_rx = "issue|ticket|task"
+    kv_rx = "fix|fixes|issue|ticket|task"
     nm_rx = "|".join([
         r"gh-[0-9]+",
         r"#?[0-9]+",
@@ -208,7 +228,7 @@ def make_prefix_suffix_regexp(org, repo, is_prefix):
     ])
 
     ref_rx = f"({kv_rx}\\s+)?({nm_rx})"
-    sep_rx = r"[][(){}:]"
+    sep_rx = r"[][(){}:—–-]"
 
     rx = f"\\s*{sep_rx}?\\s*({ref_rx})\\s*{sep_rx}?\\s*"
 
@@ -786,7 +806,7 @@ def checkout_pr(org, repo, pr_number):
 # (link issue to PR, set milestone of PR and issue, etc)
 def update_pr_metadata(org, repo, pr_number, issue_number, issue_milestone,
                        no_issue, no_milestone):
-    def update_link_to_issue():
+    def _update_linked_issue():
         pr_info = query_pr_info(org, repo, pr_number)
 
         nonlocal issue_number
@@ -800,6 +820,8 @@ def update_pr_metadata(org, repo, pr_number, issue_number, issue_milestone,
 
         if is_uptodate:
             return
+
+        ask(f'Link to issue gh-{issue_number}?')
 
         try:
             response = json.loads(subprocess.run(
@@ -822,51 +844,47 @@ def update_pr_metadata(org, repo, pr_number, issue_number, issue_milestone,
 
         query_pr_info.cache_clear()
 
-    def update_milestone_of_issue():
+    def _update_linked_milestone():
         pr_info = query_pr_info(org, repo, pr_number)
 
-        is_uptodate = pr_info['issue_milestone'] and \
+        issue_uptodate = pr_info['issue_milestone'] and \
             (not issue_milestone or pr_info['issue_milestone'] == issue_milestone)
 
-        if is_uptodate:
+        pr_uptodate = pr_info['pr_milestone'] and \
+            pr_info['pr_milestone'] == pr_info['issue_milestone']
+
+        if issue_uptodate and pr_uptodate:
             return
 
-        issue_org, issue_repo, issue_number = pr_info['issue_link']
+        ask(f'Link to milestone {issue_milestone}?')
 
-        run_cmd([
-            'gh', 'issue', 'edit',
-            '--repo', f'{issue_org}/{issue_repo}',
-            '--milestone', issue_milestone,
-            issue_number,
-            ])
+        if not issue_uptodate:
+            issue_org, issue_repo, issue_number = pr_info['issue_link']
+
+            run_cmd([
+                'gh', 'issue', 'edit',
+                '--repo', f'{issue_org}/{issue_repo}',
+                '--milestone', issue_milestone,
+                issue_number,
+                ])
+
+        if not pr_uptodate:
+            run_cmd([
+                'gh', 'pr', 'edit',
+                '--repo', f'{org}/{repo}',
+                '--milestone', pr_info['issue_milestone'],
+                pr_number,
+                ])
 
         query_issue_info.cache_clear()
         query_pr_info.cache_clear()
 
-    def update_milestone_of_pr():
-        pr_info = query_pr_info(org, repo, pr_number)
-
-        is_uptodate = pr_info['pr_milestone'] and \
-            pr_info['pr_milestone'] == pr_info['issue_milestone']
-
-        if is_uptodate:
-            return
-
-        run_cmd([
-            'gh', 'pr', 'edit',
-            '--repo', f'{org}/{repo}',
-            '--milestone', pr_info['issue_milestone'],
-            pr_number,
-            ])
-
-        query_pr_info.cache_clear()
-
     if not no_issue:
-        update_link_to_issue()
+        _update_linked_issue()
 
         if not no_milestone:
-            update_milestone_of_issue()
-            update_milestone_of_pr()
+            _update_linked_milestone()
+            _update_milestone_of_pr()
 
 # fetch source and target commits
 def fetch_pr_commits(org, repo, pr_number):
@@ -1169,6 +1187,8 @@ merge_pr_parser.add_argument('--ignore-review', action='store_true', dest='ignor
                              help="proceed even if pr has requested changes")
 merge_pr_parser.add_argument('--no-push', action='store_true', dest='no_push',
                              help="don't actually push and merge anything")
+merge_pr_parser.add_argument('-y', '--yes', action='store_true', dest='yes',
+                             help="don't ask for confirmation, always assume yes")
 merge_pr_parser.add_argument('-n', '--dry-run', action='store_true', dest='dry_run',
                              help="don't actually run commands, just print them")
 
@@ -1183,6 +1203,9 @@ args = parser.parse_args()
 if hasattr(args, 'dry_run'):
     DRY_RUN = args.dry_run
 
+if hasattr(args, 'yes'):
+    ASK = not args.yes
+
 colorama.init()
 check_tools()
 
@@ -1190,11 +1213,11 @@ org, repo = parse_repo(args.repo)
 
 if args.command == 'show_issue':
     show_issue(org, repo, args.issue_number, args.json)
-    exit(0)
+    sys.exit(0)
 
 if args.command == 'show_pr':
     show_pr(org, repo, args.pr_number, args.json)
-    exit(0)
+    sys.exit(0)
 
 if args.command == 'merge_pr':
     if int(bool(args.rebase)) + int(bool(args.squash)) != 1:
@@ -1216,7 +1239,7 @@ if args.command == 'merge_pr':
         fetch_pr_commits(org, repo, args.pr_number)
         if args.squash:
             # if we're going to squash-merge, then squash commits before rebasing
-            # this squash-merge will work even when rebase-merge produces conflicts
+            # squash-merge may work even when rebase-merge produces conflicts
             squash_pr_commits(org, repo, args.pr_number, args.title, args.no_issue)
         # no matter if we do squash-merge or rebase-merge, rebase pr on target
         rebase_pr_commits(org, repo, args.pr_number)
@@ -1224,8 +1247,10 @@ if args.command == 'merge_pr':
             # if we're doing rebase-merge, we must preserve original commits,
             # but ensure that each commit message has correct prefix
             reword_pr_commits(org, repo, args.pr_number, args.title, args.no_issue)
+        # show edited history
         print_pr_commits(org, repo, args.pr_number)
         if not args.no_push:
+            ask('Force-push and merge?')
             force_push_pr(org, repo, args.pr_number)
             if args.ignore_state:
                 undraft_pr(org, repo, args.pr_number)
@@ -1235,10 +1260,10 @@ if args.command == 'merge_pr':
         # remove worktree in /tmp
         leave_worktree(orig_path)
         if merged:
-            # delete temp branch (but only on success)
+            # delete temp branch (only on success)
             delete_ref(pr_ref)
-    exit(0)
+    sys.exit(0)
 
 if args.command == 'sync_labels':
     sync_labels(org, repo)
-    exit(0)
+    sys.exit(0)
