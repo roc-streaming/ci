@@ -135,3 +135,12 @@ printf '{"http": {
     | ./packages/functions/keepalive/stub \
     | jq -C .
 ```
+
+## Adding action
+
+Add `package.json`, `index.js`, `action.yml`, then run:
+
+```
+npm init -y
+npm install
+```
