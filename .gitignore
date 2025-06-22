@@ -2,6 +2,7 @@
 .deployed
 .env
 .nimbella
+.aider.*
 __deployer__.zip
 __pycache__/
 node_modules

@@ -1,0 +1,15 @@
+name: 'Save and restore ccache'
+description: 'Restore ccache dir and add post hook to save it'
+
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
+  repo:
+    description: 'Repo full name in form <org>/<repo>'
+    required: true
+
+runs:
+  using: 'node20'
+  main: 'dist/main/index.js'
+  post: 'dist/post/index.js'
