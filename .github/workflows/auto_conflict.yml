@@ -37,7 +37,7 @@ jobs:
           repo: ${{ github.event.client_payload.repo }}
           github-token: ${{ secrets.BOT_TOKEN }}
 
-      # remove 'needs rebase' label from pull requests without conflicts, if present
+      # remove 'needs-rebase' status from pull requests without conflicts, if present
       - if: |
           steps.pr-statuses.outputs.without-conflicts != '[]'
         uses: roc-streaming/ci/actions/update-labels@main
@@ -49,7 +49,7 @@ jobs:
             S-needs-rebase
           github-token: ${{ secrets.BOT_TOKEN }}
 
-      # add 'needs rebase' label to pull requests with conflicts, if missing
+      # add 'needs-rebase' status to pull requests with conflicts, if missing
       - if: |
           steps.pr-statuses.outputs.with-conflicts != '[]'
         uses: roc-streaming/ci/actions/update-labels@main
@@ -62,7 +62,7 @@ jobs:
             S-needs-rebase
           github-token: ${{ secrets.BOT_TOKEN }}
 
-      # post comment on pull requests where 'needs rebase' label was missing and we added it
+      # post comment on pull requests where we've just added 'needs-rebase' status
       - if: |
           steps.add-labels.outputs.updated != null &&
           steps.add-labels.outputs.updated != '[]'

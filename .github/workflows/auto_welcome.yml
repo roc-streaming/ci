@@ -61,7 +61,7 @@ jobs:
 
              **Code review**
 
-             - until ready, mark PR as draft, when ready, undraft and request review
+             - until ready, mark PR as draft; when ready, undraft and request review
              - don't resolve discussions by yourself, instead comment or thumb-up
              - re-request review after addressing feedback
 

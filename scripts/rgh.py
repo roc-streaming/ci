@@ -1077,7 +1077,7 @@ COMMON_LABELS = [
     ('S-needs-revision',     '#f4e68b', 'status: Author should revise PR and address feedback'),
     ('S-not-a-bug',          '#ef9928', 'status: Working as intended'),
     ('S-postponed',          '#9e5847', 'status: Postponed for an indefinite period'),
-    ('S-ready-for-review',   '#2dc439', 'status: PR can be reviewed'),
+    ('S-ready-for-review',   '#73c7ff', 'status: PR can be reviewed'),
     ('S-review-in-progress', '#e9ef99', 'status: PR is being reviewed'),
     ('S-stalled',            '#F9D0C4', 'status: PR or issue is abandoned'),
     ('S-waiting-reply',      '#F9D0C4', 'status: Waiting for response from issue or PR author'),
