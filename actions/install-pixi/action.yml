@@ -1,0 +1,89 @@
+name: "Install pixi"
+description: "Install pixi and setup specified environment"
+
+inputs:
+  env:
+    description: "Pixi environment to install"
+    required: false
+    default: "default"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Export variables
+      shell: bash
+      run: |
+        echo "PIXI_VERSION=v0.63.2" >> $GITHUB_ENV
+
+    - name: Cache pixi
+      uses: actions/cache@v5
+      with:
+        path: ${{ runner.temp }}/pixi-installer
+        key: pixi-${{ runner.os }}-${{ env.PIXI_VERSION }}
+
+    - name: Install pixi (Linux)
+      if: runner.os == 'Linux'
+      working-directory: ${{ runner.temp }}
+      shell: bash
+      env:
+        archive: pixi-x86_64-unknown-linux-musl.tar.gz
+        checksum: b2a9e26bb6c80fe00618a02e7198dec222e1fbcec61e04c11b6e6538089ab100
+      run: |
+        mkdir -p pixi-installer
+        [ -f pixi-installer/pixi.tar.gz ] || wget -O pixi-installer/pixi.tar.gz \
+          https://github.com/prefix-dev/pixi/releases/download/${{ env.PIXI_VERSION }}/${{ env.archive }}
+        echo "${{ env.checksum }} pixi-installer/pixi.tar.gz" \
+          | sha256sum -c \
+          || exit 1
+        sudo tar -C /usr/local/bin -xvf pixi-installer/pixi.tar.gz
+
+    - name: Install pixi (macOS)
+      if: runner.os == 'macOS'
+      working-directory: ${{ runner.temp }}
+      shell: bash
+      env:
+        archive: pixi-aarch64-apple-darwin.tar.gz
+        checksum: 28fca5e7335b5f6b5b05acb9f83b61fa65e27e5dd69fe7a1750aa884ea4163cb
+      run: |
+        mkdir -p pixi-installer
+        [ -f pixi-installer/pixi.tar.gz ] || curl -fsSL -o pixi-installer/pixi.tar.gz \
+          https://github.com/prefix-dev/pixi/releases/download/${{ env.PIXI_VERSION }}/${{ env.archive }}
+        echo "${{ env.checksum }}  pixi-installer/pixi.tar.gz" \
+          | shasum -a 256 -c \
+          || exit 1
+        sudo tar -C /usr/local/bin -xvf pixi-installer/pixi.tar.gz
+
+    - name: Install pixi (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        archive: pixi-x86_64-pc-windows-msvc.zip
+        checksum: 8a2e31c293ce0a308c2dcf3fae599465bdc97dbd8eefbd320e8ae6cf22de9262
+      run: |
+        $installerDir = "$env:RUNNER_TEMP\pixi-installer"
+        New-Item -ItemType Directory -Force -Path $installerDir | Out-Null
+        $zipPath = "$installerDir\pixi.zip"
+        if (-not (Test-Path $zipPath)) {
+          Invoke-WebRequest -Uri "https://github.com/prefix-dev/pixi/releases/download/${{ env.PIXI_VERSION }}/${{ env.archive }}" -OutFile $zipPath
+        }
+        $hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLower()
+        if ($hash -ne "${{ env.checksum }}") {
+          Write-Error "Checksum mismatch: expected ${{ env.checksum }}, got $hash"
+          exit 1
+        }
+        $binDir = "$env:RUNNER_TEMP\pixi-bin"
+        Expand-Archive -Path $zipPath -DestinationPath $binDir -Force
+        Add-Content -Path $env:GITHUB_PATH -Value $binDir
+
+    - name: Cache environment
+      uses: actions/cache@v5
+      with:
+        path: .pixi
+        key: env-${{ runner.os }}-${{ inputs.env }}-${{ hashFiles('pixi.*') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs.env }}-
+
+    - name: Install environment
+      shell: bash
+      run: |
+        pixi install -e ${{ inputs.env }}
