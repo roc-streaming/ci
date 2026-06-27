@@ -884,7 +884,6 @@ def update_pr_metadata(org, repo, pr_number, issue_number, issue_milestone,
 
         if not no_milestone:
             _update_linked_milestone()
-            _update_milestone_of_pr()
 
 # fetch source and target commits
 def fetch_pr_commits(org, repo, pr_number):
