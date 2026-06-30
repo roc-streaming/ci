@@ -60,10 +60,22 @@ make build_functions
 
 ## Deploy functions
 
-Encrypt a secret (for `.env` file):
+Generate GitHub webhook secret (`GH_SECRET`):
 
 ```
-echo -n <secret> | openssl enc -aes-256-cbc -a -salt -pbkdf2 -pass pass:<key> | tr -d '\n'
+openssl rand -hex 32
+```
+
+Generate a key (query parameter):
+
+```
+tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48
+```
+
+Encrypt variable (`GH_SECRET` and `GH_TOKEN` in `.env`) with the key:
+
+```
+echo -n <var> | openssl enc -aes-256-cbc -a -salt -pbkdf2 -pass pass:<key> | tr -d '\n'
 ```
 
 Deploy all digital ocean functions:
