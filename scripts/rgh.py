@@ -905,7 +905,7 @@ def squash_pr_commits(org, repo, pr_number, title, no_issue):
     # build and validate commit message
     commit_message = make_message(
         org, repo,
-        pr_info['issue_link'] if not no_issue else None,
+        pr_info['issue_link'] if not no_issue else pr_info['pr_link'],
         title or pr_info['pr_title'])
 
     if len(commit_message) > 72:
@@ -950,7 +950,7 @@ def reword_pr_commits(org, repo, pr_number, title, no_issue):
     pr_info = query_pr_info(org, repo, pr_number)
 
     if no_issue:
-        commit_prefix = ''
+        commit_prefix = make_prefix(org, repo, pr_info['pr_link']) + ': '
     else:
         commit_prefix = make_prefix(org, repo, pr_info['issue_link']) + ': '
 
