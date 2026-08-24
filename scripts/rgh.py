@@ -916,6 +916,9 @@ def squash_pr_commits(org, repo, pr_number, title, no_issue):
         'git', 'merge', '--no-edit', pr_info['target_sha'],
         ])
 
+    # first commit of PR
+    base_point = query_pr_commits(org, repo, pr_number)[0][0]
+
     # find where PR's branch forked from target branch
     fork_point = find_pr_fork_point(org, repo, pr_number)
 
@@ -924,7 +927,7 @@ def squash_pr_commits(org, repo, pr_number, title, no_issue):
         'git', 'reset', '--soft', fork_point,
         ])
     run_cmd([
-        'git', 'commit', '-C', pr_info['source_sha'],
+        'git', 'commit', '-C', base_point,
         ])
 
     # edit message
